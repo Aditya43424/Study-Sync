@@ -7,6 +7,7 @@ from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
+from pydantic import BaseModel  # Added the proper schema engine import
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -18,11 +19,10 @@ def load_lottie_url(url: str):
         return None
     return r.json()
 
-# --- UPDATED: AI ENGINE NOW ACCEPTS CONFIGURATION INPUTS ---
+# --- ENGINE FIXED: NOW USING STANDALONE PYDANTIC BASEMODEL ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     client = genai.Client()
     
-    # We build the custom user constraints dynamically right into the prompt system
     weekend_rule = "STRICT RULE: Do not allocate any study tasks on Saturdays or Sundays." if no_weekends else "You may utilize weekends for study blocks if necessary."
     
     prompt = f"""
@@ -40,11 +40,11 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     {raw_text}
     """
     
-    class TaskSchema(types.BaseModel):
+    class TaskSchema(BaseModel):  # Fixed inheritance here
         task_name: str
         due_date: str
 
-    class SyllabusOutput(types.BaseModel):
+    class SyllabusOutput(BaseModel):  # Fixed inheritance here
         tasks: list[TaskSchema]
 
     response = client.models.generate_content(
@@ -174,7 +174,7 @@ with right_panel:
                 for page in doc:
                     full_text += page.get_text()
                 
-                # B. Execute the AI Engine with LIVE control values passed through
+                # B. Execute the AI Engine
                 ai_data = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends)
                 total_tasks = len(ai_data["tasks"])
                 
