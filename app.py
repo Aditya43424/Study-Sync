@@ -7,7 +7,7 @@ from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
-from pydantic import BaseModel  # Added the proper schema engine import
+from pydantic import BaseModel
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -19,33 +19,45 @@ def load_lottie_url(url: str):
         return None
     return r.json()
 
-# --- ENGINE FIXED: NOW USING STANDALONE PYDANTIC BASEMODEL ---
+# --- ENGINE EXPANSION: ADDED STUDY PLAN SCHEMA MATRIX ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     client = genai.Client()
     
-    weekend_rule = "STRICT RULE: Do not allocate any study tasks on Saturdays or Sundays." if no_weekends else "You may utilize weekends for study blocks if necessary."
+    weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
     
     prompt = f"""
-    You are an expert academic coordinator and personal study coach. 
-    Analyze the following syllabus text and extract all major assignments, quizzes, projects, and exams.
+    You are an elite academic strategy coach. Analyze the given syllabus text.
     
-    For each task, identify its name and its explicit due date. If a year is not provided, assume it is 2026.
+    STEP 1: Extract all major tasks (assignments, exams, quizzes, projects) with their due dates.
+    STEP 2: Build a comprehensive, chronological study schedule leading up to those dates.
+            Break down the preparation into actionable study items/milestones across different dates.
     
-    CRITICAL USER CONSTRAINTS TO CONSIDER FOR PATTERNS:
-    1. The student can only study for {hours} hours per day.
-    2. The desired study intensity pace is '{intensity}'. 
-    3. {weekend_rule}
+    CRITICAL DESIGN RULES:
+    - The student can only dedicate {hours} hours per day to studying.
+    - Match the preparation pace to a '{intensity}' intensity level.
+    - {weekend_rule}
+    - If a year isn't mentioned for deadlines or study dates, use 2026.
     
     Syllabus Text:
     {raw_text}
     """
     
-    class TaskSchema(BaseModel):  # Fixed inheritance here
+    # Schema for individual task deadlines
+    class TaskSchema(BaseModel):
         task_name: str
         due_date: str
 
-    class SyllabusOutput(BaseModel):  # Fixed inheritance here
+    # Schema for the structured step-by-step schedule
+    class ScheduleSchema(BaseModel):
+        scheduled_date: str
+        focus_topic: str
+        suggested_action: str
+        hours_allocated: int
+
+    # Master structure combining both datasets
+    class SyllabusOutput(BaseModel):
         tasks: list[TaskSchema]
+        study_plan: list[ScheduleSchema]
 
     response = client.models.generate_content(
         model='gemini-2.5-flash',
@@ -159,7 +171,7 @@ with right_panel:
                 st.markdown("""
                     <div style="padding: 10px 0px; margin-bottom: 10px;">
                         <p style="color: #A0AEC0; font-size: 0.95rem; font-family: system-ui; letter-spacing: 0.5px;">
-                            Reading document structure and deploying AI parsing routines...
+                            Reading document structure and deploying AI strategy routines...
                         </p>
                     </div>
                 """, unsafe_allow_html=True)
@@ -174,9 +186,10 @@ with right_panel:
                 for page in doc:
                     full_text += page.get_text()
                 
-                # B. Execute the AI Engine
+                # B. Execute the Upgraded AI Engine
                 ai_data = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends)
                 total_tasks = len(ai_data["tasks"])
+                total_blocks = len(ai_data["study_plan"])
                 
             processing_box.empty()
             
@@ -184,8 +197,8 @@ with right_panel:
                 <div class="clean-success-card">
                     <div class="success-icon">✓</div>
                     <div class="success-text-container">
-                        <h4 class="success-title">Timeline Optimized Successfully</h4>
-                        <p class="success-subtitle">AI engine successfully processed core metrics and mapped task locations.</p>
+                        <h4 class="success-title">Timeline & Schedule Optimized Successfully</h4>
+                        <p class="success-subtitle">AI engine successfully custom-built a step-by-step roadmap fitting your goals.</p>
                     </div>
                 </div>
             """)
@@ -202,10 +215,17 @@ with right_panel:
                     st.metric(label="AI Detected Tasks", value=f"{total_tasks} Items")
             with m_col3:
                 with st.container(border=True):
-                    st.metric(label="Calculated Study Blocks", value=f"{total_tasks * study_hours} Slots")
+                    st.metric(label="Calculated Study Milestones", value=f"{total_blocks} Blocks")
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Render Live Data Matrix
-            st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>📅 Extracted Deadlines Matrix</p>", unsafe_allow_html=True)
-            st.dataframe(ai_data["tasks"], use_container_width=True)
+            # Layout Grid split for Deadlines vs Detailed Schedule
+            t_col1, t_col2 = st.columns([1, 2], gap="medium")
+            
+            with t_col1:
+                st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>📅 Extracted Deadlines</p>", unsafe_allow_html=True)
+                st.dataframe(ai_data["tasks"], use_container_width=True)
+                
+            with t_col2:
+                st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>🔄 Personalized Study Roadmap</p>", unsafe_allow_html=True)
+                st.dataframe(ai_data["study_plan"], use_container_width=True)
