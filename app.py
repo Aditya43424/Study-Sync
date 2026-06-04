@@ -4,6 +4,8 @@ import requests
 import json
 import fitz  # PyMuPDF
 import pandas as pd
+import uuid  # Added for generating strict unique event tokens
+from datetime import datetime  # Added for event creation timestamps
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from google import genai
@@ -26,18 +28,33 @@ def load_lottie_url(url: str):
         return None
     return r.json()
 
+# --- FIXED: PRODUCTION-GRADE ICS CALENDAR GENERATOR ---
 def generate_ics_file(study_dataframe):
-    ics_text = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Study Sync//Study Planner//EN\nCALSCALE:GREGORIAN\n"
+    # iCalendar protocol strictly requires Windows-style CRLF (\r\n) line endings
+    nl = "\r\n"
+    
+    # Generate a single timestamp for when this calendar bundle was compiled
+    current_timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    
+    ics_text = f"BEGIN:VCALENDAR{nl}VERSION:2.0{nl}PRODID:-//Study Sync//Study Planner//EN{nl}CALSCALE:GREGORIAN{nl}"
+    
     for _, row in study_dataframe.iterrows():
         clean_date = str(row['Scheduled Date']).replace("-", "").strip()
         if len(clean_date) == 8 and clean_date.isdigit():
-            ics_text += "BEGIN:VEVENT\n"
-            ics_text += f"SUMMARY:📚 Sync Focus: {row['Focus Topic']}\n"
-            ics_text += f"DESCRIPTION:Actionable Item: {row['Suggested Action']}\\nTarget Duration: {row['Hours Allocated']} hours.\n"
-            ics_text += f"DTSTART;VALUE=DATE:{clean_date}\n"
-            ics_text += f"DTEND;VALUE=DATE:{clean_date}\n"
-            ics_text += "END:VEVENT\n"
-    ics_text += "END:VCALENDAR"
+            # Create a completely unique cryptographic ID for this specific block
+            # This prevents desktop clients from throwing multi-event import errors
+            unique_event_id = str(uuid.uuid4())
+            
+            ics_text += f"BEGIN:VEVENT{nl}"
+            ics_text += f"UID:{unique_event_id}{nl}"
+            ics_text += f"DTSTAMP:{current_timestamp}{nl}"
+            ics_text += f"SUMMARY:📚 Focus: {row['Focus Topic']}{nl}"
+            ics_text += f"DESCRIPTION:Action: {row['Suggested Action']} | Allocated: {row['Hours Allocated']} hours.{nl}"
+            ics_text += f"DTSTART;VALUE=DATE:{clean_date}{nl}"
+            ics_text += f"DTEND;VALUE=DATE:{clean_date}{nl}"
+            ics_text += f"END:VEVENT{nl}"
+            
+    ics_text += f"END:VCALENDAR"
     return ics_text
 
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
@@ -105,7 +122,6 @@ st.html("""
         font-weight: 700;
     }
     
-    /* Primary Execution Button Profile */
     div.stButton > button:first-child {
         background: linear-gradient(90deg, #00C6FF, #0072FF) !important;
         color: white !important;
@@ -115,7 +131,6 @@ st.html("""
         font-weight: 600 !important;
     }
     
-    /* Secondary Action Export Buttons */
     div.stDownloadButton > button:first-child {
         background: #1E293B !important;
         color: #00C6FF !important;
@@ -124,7 +139,6 @@ st.html("""
         width: 100% !important;
     }
     
-    /* Custom style targeting the text above the real-time progress bar */
     .progress-status-text {
         font-family: system-ui, sans-serif;
         font-size: 0.95rem;
@@ -184,8 +198,6 @@ with right_panel:
         st.success(f"⚡ Linked with sequence target: **{uploaded_file.name}**")
         
         if st.button("Generate Optimized Timeline", use_container_width=True):
-            
-            # --- START: REAL-TIME NUMBER PIPELINE PROGRESS BAR ---
             progress_bar = st.progress(0)
             status_message = st.empty()
             
@@ -198,7 +210,7 @@ with right_panel:
             full_text = ""
             for page in doc:
                 full_text += page.get_text()
-            time.sleep(0.6)  # Paced visual delay for display stability
+            time.sleep(0.4)
             
             # Phase 2: AI Core Handshake
             status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting text arrays to Gemini neural network...</p>', unsafe_allow_html=True)
@@ -220,17 +232,15 @@ with right_panel:
                     } for item in raw_ai_output["study_plan"]
                 ]
             }
-            time.sleep(0.6)
-            
-            # Phase 4: Finalizing Dashboard Layout
-            status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Rendering timeline grids and analytics metrics...</p>', unsafe_allow_html=True)
-            progress_bar.progress(100)
             time.sleep(0.4)
             
-            # Wipe processing wrappers from screen layout
+            # Phase 4: Finalizing Layout
+            status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Rendering timeline grids and analytics metrics...</p>', unsafe_allow_html=True)
+            progress_bar.progress(100)
+            time.sleep(0.3)
+            
             progress_bar.empty()
             status_message.empty()
-            # --- END: REAL-TIME PROGRESS BAR ---
 
     # --- RENDERING ENGINE STAGE ---
     if st.session_state["ai_data"] is not None:
@@ -246,7 +256,6 @@ with right_panel:
         
         total_tasks = len(st.session_state["ai_data"]["tasks"])
         
-        # Render Core Summary Metadata Dashboard
         st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>Summary</p>", unsafe_allow_html=True)
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
@@ -261,7 +270,6 @@ with right_panel:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Main Data layouts splitting deadlines from the dynamic map
         t_col1, t_col2 = st.columns([1, 2], gap="medium")
         
         with t_col1:
