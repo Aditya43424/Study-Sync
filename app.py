@@ -3,7 +3,7 @@ import time
 import requests
 import json
 import fitz  # PyMuPDF
-import pandas as pd  # Added for structural checklist conversions
+import pandas as pd
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from google import genai
@@ -13,7 +13,7 @@ from pydantic import BaseModel
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
 
-# Initialize persistent memory state blocks so data stays locked during clicks
+# Initialize persistent memory state blocks
 if "ai_data" not in st.session_state:
     st.session_state["ai_data"] = None
 if "page_count" not in st.session_state:
@@ -28,7 +28,6 @@ def load_lottie_url(url: str):
 
 def generate_ics_file(study_dataframe):
     ics_text = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Study Sync//Study Planner//EN\nCALSCALE:GREGORIAN\n"
-    # Read rows from the active dataframe grid
     for _, row in study_dataframe.iterrows():
         clean_date = str(row['Scheduled Date']).replace("-", "").strip()
         if len(clean_date) == 8 and clean_date.isdigit():
@@ -116,13 +115,22 @@ st.html("""
         font-weight: 600 !important;
     }
     
-    /* Secondary Action Export Buttons layout adjustments */
+    /* Secondary Action Export Buttons */
     div.stDownloadButton > button:first-child {
         background: #1E293B !important;
         color: #00C6FF !important;
         border: 1px solid rgba(0, 198, 255, 0.4) !important;
         border-radius: 8px !important;
         width: 100% !important;
+    }
+    
+    /* Custom style targeting the text above the real-time progress bar */
+    .progress-status-text {
+        font-family: system-ui, sans-serif;
+        font-size: 0.95rem;
+        color: #00C6FF;
+        font-weight: 500;
+        margin-bottom: 4px;
     }
     
     .clean-success-card {
@@ -176,38 +184,55 @@ with right_panel:
         st.success(f"⚡ Linked with sequence target: **{uploaded_file.name}**")
         
         if st.button("Generate Optimized Timeline", use_container_width=True):
-            processing_box = st.empty()
-            with processing_box.container():
-                st.markdown("<p style='color: #A0AEC0;'>Reading document structure and deploying AI strategy routines...</p>", unsafe_allow_html=True)
-                if lottie_processing:
-                    st_lottie(lottie_processing, height=140, key="proc_anim")
-                
-                # A. Extract Text using PyMuPDF
-                doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-                st.session_state["page_count"] = doc.page_count
-                full_text = ""
-                for page in doc:
-                    full_text += page.get_text()
-                
-                # B. Execute AI Execution Engine
-                raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends)
-                
-                # C. Save arrays to state with interactive boolean tracking flags
-                st.session_state["ai_data"] = {
-                    "tasks": raw_ai_output["tasks"],
-                    "study_plan": [
-                        {
-                            "Status": False, # Inject checkbox column start condition
-                            "Scheduled Date": item["scheduled_date"],
-                            "Focus Topic": item["focus_topic"],
-                            "Suggested Action": item["suggested_action"],
-                            "Hours Allocated": item["hours_allocated"]
-                        } for item in raw_ai_output["study_plan"]
-                    ]
-                }
-            processing_box.empty()
+            
+            # --- START: REAL-TIME NUMBER PIPELINE PROGRESS BAR ---
+            progress_bar = st.progress(0)
+            status_message = st.empty()
+            
+            # Phase 1: File Reading
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Initializing local buffer and mapping PDF lines...</p>', unsafe_allow_html=True)
+            progress_bar.progress(25)
+            
+            doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+            st.session_state["page_count"] = doc.page_count
+            full_text = ""
+            for page in doc:
+                full_text += page.get_text()
+            time.sleep(0.6)  # Paced visual delay for display stability
+            
+            # Phase 2: AI Core Handshake
+            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting text arrays to Gemini neural network...</p>', unsafe_allow_html=True)
+            progress_bar.progress(50)
+            raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends)
+            
+            # Phase 3: Matrix Restructuring
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Parsing structural schema and initializing data rows...</p>', unsafe_allow_html=True)
+            progress_bar.progress(75)
+            st.session_state["ai_data"] = {
+                "tasks": raw_ai_output["tasks"],
+                "study_plan": [
+                    {
+                        "Status": False,
+                        "Scheduled Date": item["scheduled_date"],
+                        "Focus Topic": item["focus_topic"],
+                        "Suggested Action": item["suggested_action"],
+                        "Hours Allocated": item["hours_allocated"]
+                    } for item in raw_ai_output["study_plan"]
+                ]
+            }
+            time.sleep(0.6)
+            
+            # Phase 4: Finalizing Dashboard Layout
+            status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Rendering timeline grids and analytics metrics...</p>', unsafe_allow_html=True)
+            progress_bar.progress(100)
+            time.sleep(0.4)
+            
+            # Wipe processing wrappers from screen layout
+            progress_bar.empty()
+            status_message.empty()
+            # --- END: REAL-TIME PROGRESS BAR ---
 
-    # --- RENDERING ENGINE STAGE (Monitored out of button boundaries for clicking persistence) ---
+    # --- RENDERING ENGINE STAGE ---
     if st.session_state["ai_data"] is not None:
         st.html("""
             <div class="clean-success-card">
@@ -219,8 +244,7 @@ with right_panel:
             </div>
         """)
         
-        # Calculations for metrics
-        total_tasks = len(st.session_state["ai_dataイン"]["tasks"] if "tasks" in st.session_state["ai_data"] else st.session_state["ai_data"]["tasks"])
+        total_tasks = len(st.session_state["ai_data"]["tasks"])
         
         # Render Core Summary Metadata Dashboard
         st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>Summary</p>", unsafe_allow_html=True)
@@ -247,39 +271,31 @@ with right_panel:
         with t_col2:
             st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 5px;'>🔄 Interactive Study Roadmap</p>", unsafe_allow_html=True)
             
-            # Convert roadmap list into an active panda's structure
             roadmap_df = pd.DataFrame(st.session_state["ai_data"]["study_plan"])
             
-            # Calculate completion ratios dynamically
             total_items = len(roadmap_df)
             completed_items = roadmap_df["Status"].sum() if total_items > 0 else 0
             completion_percentage = int((completed_items / total_items) * 100) if total_items > 0 else 0
             
-            # Render a beautiful progress bar above the data tracker box
             st.markdown(f"<p style='font-size:0.85rem; color:#A0AEC0; margin-bottom:2px;'>Progress: {completed_items}/{total_items} Milestones Completed ({completion_percentage}%)</p>", unsafe_allow_html=True)
             st.progress(completed_items / total_items if total_items > 0 else 0.0)
             
-            # --- THE MAGIC WORKHORSE: STREAMLIT DATA EDITOR ---
-            # Automatically parses boolean values to functional, clickable checklist widgets
             edited_roadmap = st.data_editor(
                 roadmap_df,
                 use_container_width=True,
-                disabled=["Scheduled Date", "Focus Topic", "Suggested Action", "Hours Allocated"], # Keep core cells non-editable
+                disabled=["Scheduled Date", "Focus Topic", "Suggested Action", "Hours Allocated"],
                 hide_index=True,
                 key="roadmap_editor"
             )
             
-            # Save toggled updates back into persistent state engine block arrays
             if not edited_roadmap.equals(roadmap_df):
                 st.session_state["ai_data"]["study_plan"] = edited_roadmap.to_dict(orient="records")
-                st.rerun() # Refresh layout values inside analytics bars instantly
+                st.rerun()
             
-            # --- EXPANDED DOWNLOAD DECK PANELS ---
             st.markdown("<br>", unsafe_allow_html=True)
             d_col1, d_col2 = st.columns(2)
             
             with d_col1:
-                # 1. Export as a native calendar sync layer file
                 calendar_data = generate_ics_file(edited_roadmap)
                 st.download_button(
                     label="📅 Export to Calendar (.ics)",
@@ -289,7 +305,6 @@ with right_panel:
                     use_container_width=True
                 )
             with d_col2:
-                # 2. Export as an editable spreadsheet spreadsheet model data ledger
                 csv_data = edited_roadmap.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📊 Download Spreadsheet (.csv)",
