@@ -4,8 +4,8 @@ import requests
 import json
 import fitz  # PyMuPDF
 import pandas as pd
-import uuid  # Added for generating strict unique event tokens
-from datetime import datetime  # Added for event creation timestamps
+import uuid  
+from datetime import datetime, timedelta  # Added timedelta for calendar offset rules
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from google import genai
@@ -28,21 +28,24 @@ def load_lottie_url(url: str):
         return None
     return r.json()
 
-# --- FIXED: PRODUCTION-GRADE ICS CALENDAR GENERATOR ---
+# --- FIXED: SPEC-COMPLIANT ALL-DAY CALENDAR EVENT BUILDER ---
 def generate_ics_file(study_dataframe):
-    # iCalendar protocol strictly requires Windows-style CRLF (\r\n) line endings
     nl = "\r\n"
-    
-    # Generate a single timestamp for when this calendar bundle was compiled
     current_timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    
     ics_text = f"BEGIN:VCALENDAR{nl}VERSION:2.0{nl}PRODID:-//Study Sync//Study Planner//EN{nl}CALSCALE:GREGORIAN{nl}"
     
     for _, row in study_dataframe.iterrows():
-        clean_date = str(row['Scheduled Date']).replace("-", "").strip()
-        if len(clean_date) == 8 and clean_date.isdigit():
-            # Create a completely unique cryptographic ID for this specific block
-            # This prevents desktop clients from throwing multi-event import errors
+        date_str = str(row['Scheduled Date']).strip()
+        try:
+            # Safely parse the ISO date format string
+            start_dt = datetime.strptime(date_str, "%Y-%m-%d")
+            
+            # CRITICAL SPEC FIX: The DTEND for an all-day event must be 
+            # exactly 1 day AFTER the start date to render as a single-day event.
+            end_dt = start_dt + timedelta(days=1)
+            
+            clean_start = start_dt.strftime("%Y%m%d")
+            clean_end = end_dt.strftime("%Y%m%d")
             unique_event_id = str(uuid.uuid4())
             
             ics_text += f"BEGIN:VEVENT{nl}"
@@ -50,28 +53,44 @@ def generate_ics_file(study_dataframe):
             ics_text += f"DTSTAMP:{current_timestamp}{nl}"
             ics_text += f"SUMMARY:📚 Focus: {row['Focus Topic']}{nl}"
             ics_text += f"DESCRIPTION:Action: {row['Suggested Action']} | Allocated: {row['Hours Allocated']} hours.{nl}"
-            ics_text += f"DTSTART;VALUE=DATE:{clean_date}{nl}"
-            ics_text += f"DTEND;VALUE=DATE:{clean_date}{nl}"
+            ics_text += f"DTSTART;VALUE=DATE:{clean_start}{nl}"
+            ics_text += f"DTEND;VALUE=DATE:{clean_end}{nl}"  # Fixed next-day parameter
             ics_text += f"END:VEVENT{nl}"
-            
+        except Exception:
+            # Emergency string-manipulation fallback
+            clean_date = date_str.replace("-", "").strip()
+            if len(clean_date) == 8 and clean_date.isdigit():
+                unique_event_id = str(uuid.uuid4())
+                ics_text += f"BEGIN:VEVENT{nl}"
+                ics_text += f"UID:{unique_event_id}{nl}"
+                ics_text += f"DTSTAMP:{current_timestamp}{nl}"
+                ics_text += f"SUMMARY:📚 Focus: {row['Focus Topic']}{nl}"
+                ics_text += f"DESCRIPTION:Action: {row['Suggested Action']} | Allocated: {row['Hours Allocated']} hours.{nl}"
+                ics_text += f"DTSTART;VALUE=DATE:{clean_date}{nl}"
+                ics_text += f"DTEND;VALUE=DATE:{clean_date}{nl}"
+                ics_text += f"END:VEVENT{nl}"
+                
     ics_text += f"END:VCALENDAR"
     return ics_text
 
+# --- FIXED: AI ENGINE SYSTEM WITH ENFORCED CHRONOLOGICAL SPACING ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     client = genai.Client()
     weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
     
     prompt = f"""
     You are an elite academic strategy coach. Analyze the given syllabus text.
+    
     STEP 1: Extract all major tasks (assignments, exams, quizzes, projects) with their due dates.
-    STEP 2: Build a comprehensive, chronological study schedule leading up to those dates.
+    STEP 2: Build a comprehensive, chronological daily/weekly study roadmap leading up to those dates.
     
     CRITICAL DESIGN RULES:
+    - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days, weeks, and months leading up to each milestone.
+    - DO NOT give all items the same date. Each milestone must have its own separate, incremental execution date.
     - The student can only dedicate {hours} hours per day to studying.
     - Match the preparation pace to a '{intensity}' intensity level.
     - {weekend_rule}
-    - CRITICAL: All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format only.
-    - If a year isn't explicitly clear, assume it is 2026.
+    - All 'due_date' and 'scheduled_date' fields MUST use the strict standard 'YYYY-MM-DD' format only (e.g. 2026-06-15).
     
     Syllabus Text:
     {raw_text}
