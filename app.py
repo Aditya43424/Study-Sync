@@ -5,7 +5,7 @@ import json
 import fitz  # PyMuPDF
 import pandas as pd
 import uuid  
-from datetime import datetime, timedelta  
+from datetime import datetime, timedelta, time as dt_time # Added dt_time for default picker parameters
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
@@ -67,8 +67,8 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- AI ENGINE SYSTEM WITH FIXED TIME-SLOT LOGIC ---
-def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
+# --- AI ENGINE SYSTEM UPDATED TO ACCEPT USER AVAILABILITY WINDOWS ---
+def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     client = genai.Client()
     weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
     
@@ -79,7 +79,8 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     STEP 2: Build a comprehensive, chronological daily/weekly study roadmap leading up to those dates.
     
     CRITICAL DESIGN RULES:
-    - For each study item, assign a realistic daily 'time_slot' window (e.g., '09:00 AM - 12:00 PM', '02:00 PM - 04:00 PM') based on the hours allocated.
+    - USER AVAILABILITY WINDOW: The student is ONLY free to study between {start_hr} and {end_hr}. 
+    - Every generated 'time_slot' value MUST fall strictly within this window (e.g., if the window is 04:00 PM - 08:00 PM, a slot could be '04:30 PM - 06:30 PM').
     - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days.
     - The student can only dedicate {hours} hours per day to studying.
     - Match the preparation pace to a '{intensity}' intensity level.
@@ -96,7 +97,7 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
 
     class ScheduleSchema(BaseModel):
         scheduled_date: str
-        time_slot: str  # New string field to map direct clock times
+        time_slot: str  
         focus_topic: str
         suggested_action: str
         hours_allocated: int
@@ -205,110 +206,15 @@ with left_panel:
         skip_weekends = st.toggle("Exclude Weekends")
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("⏱️ Session Timer")
-    
-    # --- BROWSWER INTERACTIVE POMODORO TIMER COMPONENT ---
-    pomodoro_html = """
-    <div id="timer-container">
-        <div id="time-display">25:00</div>
-        <div id="controls-row">
-            <button id="start-btn" onclick="toggleTimer()">Start Focus</button>
-            <button id="reset-btn" onclick="resetTimer()">Reset</button>
-        </div>
-    </div>
-    
-    <style>
-        #timer-container {
-            background: #0E1117;
-            border: 1px solid rgba(0, 198, 255, 0.2);
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            font-family: system-ui, -apple-system, sans-serif;
-        }
-        #time-display {
-            font-size: 3rem;
-            font-weight: 700;
-            color: #00C6FF;
-            margin-bottom: 15px;
-            text-shadow: 0 0 10px rgba(0, 198, 255, 0.2);
-        }
-        #controls-row {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-        button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        #start-btn {
-            background: linear-gradient(90deg, #00C6FF, #0072FF);
-            color: white;
-        }
-        #reset-btn {
-            background: #1E293B;
-            color: #A0AEC0;
-            border: 1px solid rgba(160, 174, 192, 0.2);
-        }
-        button:hover {
-            transform: translateY(-1px);
-            opacity: 0.9;
-        }
-    </style>
-    
-    <script>
-        let timer;
-        let timeLeft = 25 * 60; 
-        let isRunning = false;
+    st.subheader("🕒 Availability Window")
+    with st.container(border=True):
+        # Interactive time picker elements allowing users to select free-time brackets
+        free_from = st.time_input("I am free from:", dt_time(16, 0))  # Default: 4:00 PM
+        free_until = st.time_input("I am free until:", dt_time(21, 0))  # Default: 9:00 PM
         
-        function updateDisplay() {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            document.getElementById('time-display').innerText = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }
-        
-        function toggleTimer() {
-            const startBtn = document.getElementById('start-btn');
-            if (isRunning) {
-                clearInterval(timer);
-                startBtn.innerText = 'Resume';
-                startBtn.style.background = 'linear-gradient(90deg, #00C6FF, #0072FF)';
-                isRunning = false;
-            } else {
-                timer = setInterval(() => {
-                    if (timeLeft > 0) {
-                        timeLeft--;
-                        updateDisplay();
-                    } else {
-                        clearInterval(timer);
-                        alert('Focus Block Complete! Take a well-deserved short break.');
-                        resetTimer();
-                    }
-                }, 1000);
-                startBtn.innerText = 'Pause';
-                startBtn.style.background = '#EF4444';
-                isRunning = true;
-            }
-        }
-        
-        function resetTimer() {
-            clearInterval(timer);
-            timeLeft = 25 * 60;
-            isRunning = false;
-            updateDisplay();
-            const startBtn = document.getElementById('start-btn');
-            startBtn.innerText = 'Start Focus';
-            startBtn.style.background = 'linear-gradient(90deg, #00C6FF, #0072FF)';
-        }
-    </script>
-    """
-    components.html(pomodoro_html, height=160)
+        # Format times cleanly into reader strings (e.g. "04:00 PM")
+        string_from = free_from.strftime("%I:%M %p")
+        string_until = free_until.strftime("%I:%M %p")
 
 with right_panel:
     st.subheader("Drop your PDF here")
@@ -332,12 +238,14 @@ with right_panel:
             time.sleep(0.4)
             
             # Phase 2: AI Core Handshake
-            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting parameters to Gemini strategy networks...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting custom constraints to Gemini strategy networks...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
-            raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends)
+            
+            # Pass our two new time-boundary strings into the algorithm executor
+            raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends, string_from, string_until)
             
             # Phase 3: Matrix Restructuring
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Splitting dates and formatting clock time slots...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Splitting dates and formatting custom clock slots...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             st.session_state["ai_data"] = {
                 "tasks": raw_ai_output["tasks"],
@@ -345,7 +253,7 @@ with right_panel:
                     {
                         "Status": False,
                         "Scheduled Date": item["scheduled_date"],
-                        "Time Slot": item["time_slot"],  # Hooked up to the active schema dictionary
+                        "Time Slot": item["time_slot"],  
                         "Focus Topic": item["focus_topic"],
                         "Suggested Action": item["suggested_action"],
                         "Hours Allocated": item["hours_allocated"]
@@ -369,7 +277,7 @@ with right_panel:
                 <div class="success-icon">✓</div>
                 <div class="success-text-container">
                     <h4 class="success-title">Timeline & Schedule Optimized Successfully</h4>
-                    <p class="success-subtitle">Interactive roadmap loaded into dashboard memory. Tick items off to track progress.</p>
+                    <p class="success-subtitle">Interactive roadmap loaded into dashboard memory. Schedule built using custom availability parameters.</p>
                 </div>
             </div>
         """)
