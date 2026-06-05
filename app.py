@@ -5,12 +5,12 @@ import json
 import fitz  # PyMuPDF
 import pandas as pd
 import uuid  
-from datetime import datetime, timedelta  # Added timedelta for calendar offset rules
+from datetime import datetime, timedelta  
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
+from pydantic import BaseModel
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -28,7 +28,6 @@ def load_lottie_url(url: str):
         return None
     return r.json()
 
-# --- FIXED: SPEC-COMPLIANT ALL-DAY CALENDAR EVENT BUILDER ---
 def generate_ics_file(study_dataframe):
     nl = "\r\n"
     current_timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
@@ -37,11 +36,7 @@ def generate_ics_file(study_dataframe):
     for _, row in study_dataframe.iterrows():
         date_str = str(row['Scheduled Date']).strip()
         try:
-            # Safely parse the ISO date format string
             start_dt = datetime.strptime(date_str, "%Y-%m-%d")
-            
-            # CRITICAL SPEC FIX: The DTEND for an all-day event must be 
-            # exactly 1 day AFTER the start date to render as a single-day event.
             end_dt = start_dt + timedelta(days=1)
             
             clean_start = start_dt.strftime("%Y%m%d")
@@ -51,13 +46,12 @@ def generate_ics_file(study_dataframe):
             ics_text += f"BEGIN:VEVENT{nl}"
             ics_text += f"UID:{unique_event_id}{nl}"
             ics_text += f"DTSTAMP:{current_timestamp}{nl}"
-            ics_text += f"SUMMARY:📚 Focus: {row['Focus Topic']}{nl}"
+            ics_text += f"SUMMARY:📚 Focus [{row['Time Slot']}]: {row['Focus Topic']}{nl}"
             ics_text += f"DESCRIPTION:Action: {row['Suggested Action']} | Allocated: {row['Hours Allocated']} hours.{nl}"
             ics_text += f"DTSTART;VALUE=DATE:{clean_start}{nl}"
-            ics_text += f"DTEND;VALUE=DATE:{clean_end}{nl}"  # Fixed next-day parameter
+            ics_text += f"DTEND;VALUE=DATE:{clean_end}{nl}"  
             ics_text += f"END:VEVENT{nl}"
         except Exception:
-            # Emergency string-manipulation fallback
             clean_date = date_str.replace("-", "").strip()
             if len(clean_date) == 8 and clean_date.isdigit():
                 unique_event_id = str(uuid.uuid4())
@@ -65,7 +59,7 @@ def generate_ics_file(study_dataframe):
                 ics_text += f"UID:{unique_event_id}{nl}"
                 ics_text += f"DTSTAMP:{current_timestamp}{nl}"
                 ics_text += f"SUMMARY:📚 Focus: {row['Focus Topic']}{nl}"
-                ics_text += f"DESCRIPTION:Action: {row['Suggested Action']} | Allocated: {row['Hours Allocated']} hours.{nl}"
+                ics_text += f"DESCRIPTION:Action: {row['Suggested Action']}{nl}"
                 ics_text += f"DTSTART;VALUE=DATE:{clean_date}{nl}"
                 ics_text += f"DTEND;VALUE=DATE:{clean_date}{nl}"
                 ics_text += f"END:VEVENT{nl}"
@@ -73,7 +67,7 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- FIXED: AI ENGINE SYSTEM WITH ENFORCED CHRONOLOGICAL SPACING ---
+# --- AI ENGINE SYSTEM WITH FIXED TIME-SLOT LOGIC ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     client = genai.Client()
     weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
@@ -85,12 +79,12 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
     STEP 2: Build a comprehensive, chronological daily/weekly study roadmap leading up to those dates.
     
     CRITICAL DESIGN RULES:
-    - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days, weeks, and months leading up to each milestone.
-    - DO NOT give all items the same date. Each milestone must have its own separate, incremental execution date.
+    - For each study item, assign a realistic daily 'time_slot' window (e.g., '09:00 AM - 12:00 PM', '02:00 PM - 04:00 PM') based on the hours allocated.
+    - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days.
     - The student can only dedicate {hours} hours per day to studying.
     - Match the preparation pace to a '{intensity}' intensity level.
     - {weekend_rule}
-    - All 'due_date' and 'scheduled_date' fields MUST use the strict standard 'YYYY-MM-DD' format only (e.g. 2026-06-15).
+    - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format only.
     
     Syllabus Text:
     {raw_text}
@@ -102,6 +96,7 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends):
 
     class ScheduleSchema(BaseModel):
         scheduled_date: str
+        time_slot: str  # New string field to map direct clock times
         focus_topic: str
         suggested_action: str
         hours_allocated: int
@@ -208,6 +203,112 @@ with left_panel:
         study_hours = st.slider("Daily Study Capacity (Hours)", 1, 8, 3)
         focus_level = st.select_slider("Target Study Intensity", options=["Casual", "Balanced", "Intense"])
         skip_weekends = st.toggle("Exclude Weekends")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("⏱️ Session Timer")
+    
+    # --- BROWSWER INTERACTIVE POMODORO TIMER COMPONENT ---
+    pomodoro_html = """
+    <div id="timer-container">
+        <div id="time-display">25:00</div>
+        <div id="controls-row">
+            <button id="start-btn" onclick="toggleTimer()">Start Focus</button>
+            <button id="reset-btn" onclick="resetTimer()">Reset</button>
+        </div>
+    </div>
+    
+    <style>
+        #timer-container {
+            background: #0E1117;
+            border: 1px solid rgba(0, 198, 255, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        #time-display {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #00C6FF;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(0, 198, 255, 0.2);
+        }
+        #controls-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        #start-btn {
+            background: linear-gradient(90deg, #00C6FF, #0072FF);
+            color: white;
+        }
+        #reset-btn {
+            background: #1E293B;
+            color: #A0AEC0;
+            border: 1px solid rgba(160, 174, 192, 0.2);
+        }
+        button:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
+        }
+    </style>
+    
+    <script>
+        let timer;
+        let timeLeft = 25 * 60; 
+        let isRunning = false;
+        
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById('time-display').innerText = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        function toggleTimer() {
+            const startBtn = document.getElementById('start-btn');
+            if (isRunning) {
+                clearInterval(timer);
+                startBtn.innerText = 'Resume';
+                startBtn.style.background = 'linear-gradient(90deg, #00C6FF, #0072FF)';
+                isRunning = false;
+            } else {
+                timer = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        updateDisplay();
+                    } else {
+                        clearInterval(timer);
+                        alert('Focus Block Complete! Take a well-deserved short break.');
+                        resetTimer();
+                    }
+                }, 1000);
+                startBtn.innerText = 'Pause';
+                startBtn.style.background = '#EF4444';
+                isRunning = true;
+            }
+        }
+        
+        function resetTimer() {
+            clearInterval(timer);
+            timeLeft = 25 * 60;
+            isRunning = false;
+            updateDisplay();
+            const startBtn = document.getElementById('start-btn');
+            startBtn.innerText = 'Start Focus';
+            startBtn.style.background = 'linear-gradient(90deg, #00C6FF, #0072FF)';
+        }
+    </script>
+    """
+    components.html(pomodoro_html, height=160)
 
 with right_panel:
     st.subheader("Drop your PDF here")
@@ -221,9 +322,8 @@ with right_panel:
             status_message = st.empty()
             
             # Phase 1: File Reading
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Initializing local buffer and mapping PDF lines...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Mapping lines and extracting PDF file bytes...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
-            
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
             full_text = ""
@@ -232,12 +332,12 @@ with right_panel:
             time.sleep(0.4)
             
             # Phase 2: AI Core Handshake
-            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting text arrays to Gemini neural network...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting parameters to Gemini strategy networks...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends)
             
             # Phase 3: Matrix Restructuring
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Parsing structural schema and initializing data rows...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Splitting dates and formatting clock time slots...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             st.session_state["ai_data"] = {
                 "tasks": raw_ai_output["tasks"],
@@ -245,6 +345,7 @@ with right_panel:
                     {
                         "Status": False,
                         "Scheduled Date": item["scheduled_date"],
+                        "Time Slot": item["time_slot"],  # Hooked up to the active schema dictionary
                         "Focus Topic": item["focus_topic"],
                         "Suggested Action": item["suggested_action"],
                         "Hours Allocated": item["hours_allocated"]
@@ -254,7 +355,7 @@ with right_panel:
             time.sleep(0.4)
             
             # Phase 4: Finalizing Layout
-            status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Rendering timeline grids and analytics metrics...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Synchronizing interactive checklist frameworks...</p>', unsafe_allow_html=True)
             progress_bar.progress(100)
             time.sleep(0.3)
             
@@ -310,7 +411,7 @@ with right_panel:
             edited_roadmap = st.data_editor(
                 roadmap_df,
                 use_container_width=True,
-                disabled=["Scheduled Date", "Focus Topic", "Suggested Action", "Hours Allocated"],
+                disabled=["Scheduled Date", "Time Slot", "Focus Topic", "Suggested Action", "Hours Allocated"],
                 hide_index=True,
                 key="roadmap_editor"
             )
