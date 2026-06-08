@@ -66,17 +66,13 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- ENGINE PATCH: GRACEFUL EXCEPTION HANDLING FOR GOOGLE SERVERS ---
+# --- UPDATED ENGINE: RETURNS DETAILED ERROR LOGGING ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = genai.Client()
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
-        # Clean up any problematic binary encoding characters from large PDFs
         cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
-        
-        # Defensive Truncation: If the extracted text string is absurdly huge, 
-        # trim it slightly to fit comfortably within API gateway network limitations.
         if len(cleaned_text) > 80000:
             cleaned_text = cleaned_text[:80000]
         
@@ -124,8 +120,8 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, 
         )
         return json.loads(response.text)
     except Exception as e:
-        # Catch network glitches and return None instead of crashing with a red screen
-        return None
+        # Expose the precise traceback error string inside our interface container
+        return {"error_mode_active": True, "details": str(e)}
 
 lottie_processing = load_lottie_url("https://assets8.lottiefiles.com/packages/lf20_vnikbe9e.json")
 
@@ -172,16 +168,6 @@ st.html("""
         font-weight: 500;
         margin-bottom: 4px;
     }
-    
-    .clean-success-card {
-        display: flex;
-        align-items: center;
-        background: rgba(0, 198, 255, 0.04);
-        border: 1px solid rgba(0, 198, 255, 0.25);
-        border-radius: 12px;
-        padding: 20px 24px;
-        margin-bottom: 32px;
-    }
 </style>
 """)
 
@@ -203,7 +189,7 @@ with left_panel:
     st.subheader("🕒 Availability Window")
     with st.container(border=True):
         free_from = st.time_input("I am free from:", dt_time(17, 30))  
-        free_until = st.time_input("I am free until:", dt_time(20, 30))  
+        free_until = st.time_input("I am free until:", dt_time(21, 30)) # Expanded default window parameters to 4 hours
         string_from = free_from.strftime("%I:%M %p")
         string_until = free_until.strftime("%I:%M %p")
 
@@ -215,6 +201,16 @@ with right_panel:
         st.success(f"⚡ Linked with sequence target: **{uploaded_file.name}**")
         
         if st.button("Generate Optimized Timeline", use_container_width=True):
+            
+            # --- NEW FRONTEND VALIDATOR A: TIME MATHEMATICS CHECK ---
+            start_minutes = free_from.hour * 60 + free_from.minute
+            end_minutes = free_until.hour * 60 + free_until.minute
+            available_duration_hours = (end_minutes - start_minutes) / 60
+            
+            if available_duration_hours < study_hours:
+                st.error(f"❌ **Configuration Conflict Error:** Your Availability Window is only **{available_duration_hours:.2f} hours** long, but your Daily Study Capacity slider demands **{study_hours} hours**! Please expand your available window or lower your daily study hours target.")
+                st.stop()
+            
             progress_bar = st.progress(0)
             status_message = st.empty()
             
@@ -228,17 +224,32 @@ with right_panel:
                 full_text += page.get_text()
             time.sleep(0.4)
             
+            # --- NEW FRONTEND VALIDATOR B: SCANNED IMAGE CHECK ---
+            if not full_text.strip():
+                progress_bar.empty()
+                status_message.empty()
+                st.error("❌ **Unreadable PDF Error:** This document looks like a scanned photocopy or picture. It contains 0 text characters. Please upload a digitally generated text PDF, or try a different syllabus file!")
+                st.stop()
+            
             # Phase 2: AI Core Handshake
             status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting custom constraints to Gemini strategy networks...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
             raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends, string_from, string_until)
             
-            # Check if the defensive try-except function returned None due to a Google drop
+            # --- NEW FRONTEND VALIDATOR C: EXPOSE EXACT EXCEPTION ELEMENTS ---
+            if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
+                progress_bar.empty()
+                status_message.empty()
+                st.error("❌ **Google Core API Refusal Code:**")
+                st.code(raw_ai_output["details"], language="text")
+                st.info("💡 Pro-Tip: If the code above mentions 'API_KEY', check your Streamlit Advanced Secrets panel!")
+                st.stop()
+
             if raw_ai_output is None:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("⚠️ Google Gemini experienced a transient server drop processing this file. Please tap 'Generate Optimized Timeline' again to retry.")
+                st.error("⚠️ An unhandled exception occurred inside the Google API gateway. Please try clicking generate again.")
                 st.stop()
             
             # Phase 3: Matrix Restructuring
@@ -270,7 +281,7 @@ with right_panel:
     # --- RENDERING ENGINE STAGE ---
     if st.session_state["ai_data"] is not None:
         st.html("""
-            <div class="clean-success-card">
+            <div style="display: flex; align-items: center; background: rgba(0, 198, 255, 0.04); border: 1px solid rgba(0, 198, 255, 0.25); border-radius: 12px; padding: 20px 24px; margin-bottom: 32px;">
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
