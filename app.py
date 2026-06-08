@@ -5,7 +5,7 @@ import json
 import fitz  # PyMuPDF
 import pandas as pd
 import uuid  
-from datetime import datetime, timedelta, time as dt_time # Added dt_time for default picker parameters
+from datetime import datetime, timedelta, time as dt_time 
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
@@ -15,7 +15,6 @@ from google.genai import types
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
 
-# Initialize persistent memory state blocks
 if "ai_data" not in st.session_state:
     st.session_state["ai_data"] = None
 if "page_count" not in st.session_state:
@@ -67,54 +66,66 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- AI ENGINE SYSTEM UPDATED TO ACCEPT USER AVAILABILITY WINDOWS ---
+# --- ENGINE PATCH: GRACEFUL EXCEPTION HANDLING FOR GOOGLE SERVERS ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
-    client = genai.Client()
-    weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
-    
-    prompt = f"""
-    You are an elite academic strategy coach. Analyze the given syllabus text.
-    
-    STEP 1: Extract all major tasks (assignments, exams, quizzes, projects) with their due dates.
-    STEP 2: Build a comprehensive, chronological daily/weekly study roadmap leading up to those dates.
-    
-    CRITICAL DESIGN RULES:
-    - USER AVAILABILITY WINDOW: The student is ONLY free to study between {start_hr} and {end_hr}. 
-    - Every generated 'time_slot' value MUST fall strictly within this window (e.g., if the window is 04:00 PM - 08:00 PM, a slot could be '04:30 PM - 06:30 PM').
-    - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days.
-    - The student can only dedicate {hours} hours per day to studying.
-    - Match the preparation pace to a '{intensity}' intensity level.
-    - {weekend_rule}
-    - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format only.
-    
-    Syllabus Text:
-    {raw_text}
-    """
-    
-    class TaskSchema(BaseModel):
-        task_name: str
-        due_date: str
+    try:
+        client = genai.Client()
+        weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
+        
+        # Clean up any problematic binary encoding characters from large PDFs
+        cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
+        
+        # Defensive Truncation: If the extracted text string is absurdly huge, 
+        # trim it slightly to fit comfortably within API gateway network limitations.
+        if len(cleaned_text) > 80000:
+            cleaned_text = cleaned_text[:80000]
+        
+        prompt = f"""
+        You are an elite academic strategy coach. Analyze the given syllabus text.
+        
+        STEP 1: Extract all major tasks (assignments, exams, quizzes, projects) with their due dates.
+        STEP 2: Build a comprehensive, chronological daily/weekly study roadmap leading up to those dates.
+        
+        CRITICAL DESIGN RULES:
+        - USER AVAILABILITY WINDOW: The student is ONLY free to study between {start_hr} and {end_hr}. 
+        - Every generated 'time_slot' value MUST fall strictly within this window.
+        - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days.
+        - The student can only dedicate {hours} hours per day to studying.
+        - Match the preparation pace to a '{intensity}' intensity level.
+        - {weekend_rule}
+        - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format only.
+        
+        Syllabus Text:
+        {cleaned_text}
+        """
+        
+        class TaskSchema(BaseModel):
+            task_name: str
+            due_date: str
 
-    class ScheduleSchema(BaseModel):
-        scheduled_date: str
-        time_slot: str  
-        focus_topic: str
-        suggested_action: str
-        hours_allocated: int
+        class ScheduleSchema(BaseModel):
+            scheduled_date: str
+            time_slot: str  
+            focus_topic: str
+            suggested_action: str
+            hours_allocated: int
 
-    class SyllabusOutput(BaseModel):
-        tasks: list[TaskSchema]
-        study_plan: list[ScheduleSchema]
+        class SyllabusOutput(BaseModel):
+            tasks: list[TaskSchema]
+            study_plan: list[ScheduleSchema]
 
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=SyllabusOutput,
-        ),
-    )
-    return json.loads(response.text)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=SyllabusOutput,
+            ),
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        # Catch network glitches and return None instead of crashing with a red screen
+        return None
 
 lottie_processing = load_lottie_url("https://assets8.lottiefiles.com/packages/lf20_vnikbe9e.json")
 
@@ -171,23 +182,6 @@ st.html("""
         padding: 20px 24px;
         margin-bottom: 32px;
     }
-    
-    .success-icon {
-        background: #00C6FF;
-        color: #0E1117;
-        font-weight: bold;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 18px;
-    }
-    
-    .success-text-container { display: flex; flex-direction: column; }
-    .success-title { color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important; }
-    .success-subtitle { color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important; }
 </style>
 """)
 
@@ -208,11 +202,8 @@ with left_panel:
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("🕒 Availability Window")
     with st.container(border=True):
-        # Interactive time picker elements allowing users to select free-time brackets
-        free_from = st.time_input("I am free from:", dt_time(16, 0))  # Default: 4:00 PM
-        free_until = st.time_input("I am free until:", dt_time(21, 0))  # Default: 9:00 PM
-        
-        # Format times cleanly into reader strings (e.g. "04:00 PM")
+        free_from = st.time_input("I am free from:", dt_time(17, 30))  
+        free_until = st.time_input("I am free until:", dt_time(20, 30))  
         string_from = free_from.strftime("%I:%M %p")
         string_until = free_until.strftime("%I:%M %p")
 
@@ -241,8 +232,14 @@ with right_panel:
             status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting custom constraints to Gemini strategy networks...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
-            # Pass our two new time-boundary strings into the algorithm executor
             raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends, string_from, string_until)
+            
+            # Check if the defensive try-except function returned None due to a Google drop
+            if raw_ai_output is None:
+                progress_bar.empty()
+                status_message.empty()
+                st.error("⚠️ Google Gemini experienced a transient server drop processing this file. Please tap 'Generate Optimized Timeline' again to retry.")
+                st.stop()
             
             # Phase 3: Matrix Restructuring
             status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Splitting dates and formatting custom clock slots...</p>', unsafe_allow_html=True)
@@ -274,10 +271,10 @@ with right_panel:
     if st.session_state["ai_data"] is not None:
         st.html("""
             <div class="clean-success-card">
-                <div class="success-icon">✓</div>
-                <div class="success-text-container">
-                    <h4 class="success-title">Timeline & Schedule Optimized Successfully</h4>
-                    <p class="success-subtitle">Interactive roadmap loaded into dashboard memory. Schedule built using custom availability parameters.</p>
+                <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
+                <div style="display: flex; flex-direction: column;">
+                    <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Interactive roadmap loaded into dashboard memory.</p>
                 </div>
             </div>
         """)
