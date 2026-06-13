@@ -2,4 +2,6 @@ streamlit
 requests
 streamlit-lottie
 pymupdf
-google-genai
+pandas
+groq
+pydantic
