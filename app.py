@@ -9,8 +9,7 @@ from datetime import datetime, timedelta, time as dt_time
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
+from groq import Groq  # Installed Groq Engine
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -66,62 +65,46 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- UPDATED ENGINE: RETURNS DETAILED ERROR LOGGING ---
+# --- GROQ HIGH-SPEED AI EXECUTION ROUTINE ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
-        client = genai.Client()
-        weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
+        # Automatically connects via GROQ_API_KEY inside environment variables
+        client = Groq()
         
         cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
-        if len(cleaned_text) > 80000:
-            cleaned_text = cleaned_text[:80000]
+        if len(cleaned_text) > 40000:
+            cleaned_text = cleaned_text[:40000]
+            
+        weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
         prompt = f"""
-        You are an elite academic strategy coach. Analyze the given syllabus text.
+        You are an elite academic strategy coach. Analyze the given syllabus text and output a valid JSON string object.
+        The JSON object must contain two primary array fields matching this exact structural layout:
+        1. "tasks": an array of objects containing "task_name" and "due_date" (YYYY-MM-DD).
+        2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
         
-        STEP 1: Extract all major tasks (assignments, exams, quizzes, projects) with their due dates.
-        STEP 2: Build a comprehensive, chronological daily/weekly study roadmap leading up to those dates.
-        
-        CRITICAL DESIGN RULES:
-        - USER AVAILABILITY WINDOW: The student is ONLY free to study between {start_hr} and {end_hr}. 
-        - Every generated 'time_slot' value MUST fall strictly within this window.
-        - Assume the current date is June 2026. Realistically space out individual study plan checkpoints across distinct days.
-        - The student can only dedicate {hours} hours per day to studying.
-        - Match the preparation pace to a '{intensity}' intensity level.
+        USER AVAILABILITY CONSTRAINTS:
+        - The student is ONLY free to study between {start_hr} and {end_hr}. Every generated 'time_slot' value must fall strictly within this window.
+        - Assume the current date is June 2026. Realistically space out individual checkpoints across distinct days.
+        - Dedicated capacity: {hours} hours per day at a '{intensity}' intensity pace.
         - {weekend_rule}
-        - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format only.
+        - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format.
         
         Syllabus Text:
         {cleaned_text}
         """
-        
-        class TaskSchema(BaseModel):
-            task_name: str
-            due_date: str
 
-        class ScheduleSchema(BaseModel):
-            scheduled_date: str
-            time_slot: str  
-            focus_topic: str
-            suggested_action: str
-            hours_allocated: int
-
-        class SyllabusOutput(BaseModel):
-            tasks: list[TaskSchema]
-            study_plan: list[ScheduleSchema]
-
-      
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=SyllabusOutput,
-            ),
+        # Call Groq's flagship open-source inference system
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are a backend database parser. Output raw JSON objects matching the schema instructions. Do not write conversational explanations or text intros."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}  # Forces Groq to return clean database arrays
         )
-        return json.loads(response.text)
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
-        # Expose the precise traceback error string inside our interface container
         return {"error_mode_active": True, "details": str(e)}
 
 lottie_processing = load_lottie_url("https://assets8.lottiefiles.com/packages/lf20_vnikbe9e.json")
@@ -129,46 +112,11 @@ lottie_processing = load_lottie_url("https://assets8.lottiefiles.com/packages/lf
 # 3. GRAPHICS & THEME SYSTEM (CSS)
 st.html("""
 <style>
-    .main-title {
-        font-size: 3.6rem !important;
-        font-weight: 800;
-        background: linear-gradient(90deg, #00C6FF, #0072FF);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-top: 10px;
-        margin-bottom: 25px;
-    }
-    
-    [data-testid="stMetricSimpleValue"] {
-        font-size: 1.8rem !important;
-        color: #00C6FF !important;
-        font-weight: 700;
-    }
-    
-    div.stButton > button:first-child {
-        background: linear-gradient(90deg, #00C6FF, #0072FF) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 12px 24px !important;
-        font-weight: 600 !important;
-    }
-    
-    div.stDownloadButton > button:first-child {
-        background: #1E293B !important;
-        color: #00C6FF !important;
-        border: 1px solid rgba(0, 198, 255, 0.4) !important;
-        border-radius: 8px !important;
-        width: 100% !important;
-    }
-    
-    .progress-status-text {
-        font-family: system-ui, sans-serif;
-        font-size: 0.95rem;
-        color: #00C6FF;
-        font-weight: 500;
-        margin-bottom: 4px;
-    }
+    .main-title { font-size: 3.6rem !important; font-weight: 800; background: linear-gradient(90deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 10px; margin-bottom: 25px; }
+    [data-testid="stMetricSimpleValue"] { font-size: 1.8rem !important; color: #00C6FF !important; font-weight: 700; }
+    div.stButton > button:first-child { background: linear-gradient(90deg, #00C6FF, #0072FF) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 12px 24px !important; font-weight: 600 !important; }
+    div.stDownloadButton > button:first-child { background: #1E293B !important; color: #00C6FF !important; border: 1px solid rgba(0, 198, 255, 0.4) !important; border-radius: 8px !important; width: 100% !important; }
+    .progress-status-text { font-family: system-ui, sans-serif; font-size: 0.95rem; color: #00C6FF; font-weight: 500; margin-bottom: 4px; }
 </style>
 """)
 
@@ -190,7 +138,7 @@ with left_panel:
     st.subheader("🕒 Availability Window")
     with st.container(border=True):
         free_from = st.time_input("I am free from:", dt_time(17, 30))  
-        free_until = st.time_input("I am free until:", dt_time(21, 30)) # Expanded default window parameters to 4 hours
+        free_until = st.time_input("I am free until:", dt_time(21, 30)) 
         string_from = free_from.strftime("%I:%M %p")
         string_until = free_until.strftime("%I:%M %p")
 
@@ -203,20 +151,19 @@ with right_panel:
         
         if st.button("Generate Optimized Timeline", use_container_width=True):
             
-            # --- NEW FRONTEND VALIDATOR A: TIME MATHEMATICS CHECK ---
             start_minutes = free_from.hour * 60 + free_from.minute
             end_minutes = free_until.hour * 60 + free_until.minute
             available_duration_hours = (end_minutes - start_minutes) / 60
             
             if available_duration_hours < study_hours:
-                st.error(f"❌ **Configuration Conflict Error:** Your Availability Window is only **{available_duration_hours:.2f} hours** long, but your Daily Study Capacity slider demands **{study_hours} hours**! Please expand your available window or lower your daily study hours target.")
+                st.error(f"❌ **Configuration Conflict:** Your Availability Window ({available_duration_hours:.2f} hours) is shorter than your daily study target ({study_hours} hours).")
                 st.stop()
             
             progress_bar = st.progress(0)
             status_message = st.empty()
             
             # Phase 1: File Reading
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Mapping lines and extracting PDF file bytes...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Reading document layout strings via PyMuPDF context...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
@@ -225,36 +172,33 @@ with right_panel:
                 full_text += page.get_text()
             time.sleep(0.4)
             
-            # --- NEW FRONTEND VALIDATOR B: SCANNED IMAGE CHECK ---
             if not full_text.strip():
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Unreadable PDF Error:** This document looks like a scanned photocopy or picture. It contains 0 text characters. Please upload a digitally generated text PDF, or try a different syllabus file!")
+                st.error("❌ **Unreadable PDF Error:** This document contains 0 selectable text characters. Please use a native digital text PDF.")
                 st.stop()
             
-            # Phase 2: AI Core Handshake
-            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Transmitting custom constraints to Gemini strategy networks...</p>', unsafe_allow_html=True)
+            # Phase 2: Groq Engine Call
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting text arrays to high-speed Groq LPU cores...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
             raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends, string_from, string_until)
             
-            # --- NEW FRONTEND VALIDATOR C: EXPOSE EXACT EXCEPTION ELEMENTS ---
             if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Google Core API Refusal Code:**")
+                st.error("❌ **Groq Core API Refusal Code:**")
                 st.code(raw_ai_output["details"], language="text")
-                st.info("💡 Pro-Tip: If the code above mentions 'API_KEY', check your Streamlit Advanced Secrets panel!")
                 st.stop()
 
             if raw_ai_output is None:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("⚠️ An unhandled exception occurred inside the Google API gateway. Please try clicking generate again.")
+                st.error("⚠️ An unhandled exception occurred inside the Groq API gateway.")
                 st.stop()
             
-            # Phase 3: Matrix Restructuring
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Splitting dates and formatting custom clock slots...</p>', unsafe_allow_html=True)
+            # Phase 3: Restructuring
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Populating database frames and sorting clock slots...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             st.session_state["ai_data"] = {
                 "tasks": raw_ai_output["tasks"],
@@ -286,7 +230,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Interactive roadmap loaded into dashboard memory.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Roadmap loaded securely via ultra-low-latency Groq LPUs.</p>
                 </div>
             </div>
         """)
@@ -296,14 +240,11 @@ with right_panel:
         st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>Summary</p>", unsafe_allow_html=True)
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
-            with st.container(border=True):
-                st.metric(label="Pages Read", value=f"{st.session_state['page_count']} Pages")
+            st.container(border=True).metric(label="Pages Read", value=f"{st.session_state['page_count']} Pages")
         with m_col2:
-            with st.container(border=True):
-                st.metric(label="AI Detected Tasks", value=f"{total_tasks} Items")
+            st.container(border=True).metric(label="AI Detected Tasks", value=f"{total_tasks} Items")
         with m_col3:
-            with st.container(border=True):
-                st.metric(label="Daily Cap Target", value=f"{study_hours} Hours/Day")
+            st.container(border=True).metric(label="Daily Cap Target", value=f"{study_hours} Hours/Day")
         
         st.markdown("<br>", unsafe_allow_html=True)
         
