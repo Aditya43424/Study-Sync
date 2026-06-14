@@ -64,16 +64,18 @@ def generate_ics_file(study_dataframe):
                 
     ics_text += f"END:VCALENDAR"
     return ics_text
-
-# --- ENGINE ADVANCEMENT: HIGH-GRANULARITY EXPANSION SYSTEM ---
+# --- OPTIMIZED FOR GROQ SIZE LIMITS ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = Groq()
         
-        # Safe character extraction block
+        # Clean up binary anomalies
         cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
-        if len(cleaned_text) > 50000:
-            cleaned_text = cleaned_text[:50000]
+        
+        # CRITICAL GROQ FIX: Lowering truncation size from 40k to 18k characters 
+        # prevents the 413 error while preserving all core dates and topics.
+        if len(cleaned_text) > 18000:
+            cleaned_text = cleaned_text[:18000]
             
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
@@ -84,17 +86,15 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, 
         2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
         
         CRITICAL COMPREHENSIVE ROADMAP RULES:
-        - DO NOT compress the schedule into a high-level list of only 10 rows.
-        - For EVERY single assignment, subject module, or code lab extracted in your "tasks" list, you MUST generate a sequence of 5 to 8 separate, chronological daily study sessions leading up to its deadline.
-        - Break down your approach day-by-day (e.g., instead of just writing 'Study Subject A', break it down into 'Subject A: Unit 1 Theory Review', 'Subject A: Code Implementation Practice', 'Subject A: Optimization & Debugging Check', 'Subject A: Final Mock Review Run').
-        - This means your final "study_plan" array MUST contain an exhaustive, fully expanded list of distinct chronological rows tracking continuous student progress over multiple weeks.
+        - Generate an extensive, itemized study roadmap with separate rows for separate days.
+        - For EVERY task or module extracted, create a step-by-step sequence of detailed study blocks leading up to its deadline.
+        - Break topics down day-by-day (e.g., 'Unit 1 Core Theory', 'Lab Implementation Practice', 'Debugging Check').
         
         USER AVAILABILITY CONSTRAINTS:
-        - The student is ONLY free to study between {start_hr} and {end_hr}. Every generated 'time_slot' value must fall strictly within this window.
-        - Assume the current date is June 2026. Realistically space out individual checkpoints sequentially across separate days.
-        - Dedicated capacity: {hours} hours per day at a '{intensity}' intensity pace.
+        - Study window: strictly between {start_hr} and {end_hr}.
+        - Max capacity: {hours} hours per day at a '{intensity}' intensity pace.
         - {weekend_rule}
-        - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format.
+        - All dates must use 'YYYY-MM-DD' format.
         
         Syllabus Text:
         {cleaned_text}
