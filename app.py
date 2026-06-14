@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, time as dt_time
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
-from groq import Groq  # Installed Groq Engine
+from groq import Groq  
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -65,15 +65,15 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- GROQ HIGH-SPEED AI EXECUTION ROUTINE ---
+# --- ENGINE ADVANCEMENT: HIGH-GRANULARITY EXPANSION SYSTEM ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
-        # Automatically connects via GROQ_API_KEY inside environment variables
         client = Groq()
         
+        # Safe character extraction block
         cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
-        if len(cleaned_text) > 40000:
-            cleaned_text = cleaned_text[:40000]
+        if len(cleaned_text) > 50000:
+            cleaned_text = cleaned_text[:50000]
             
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
@@ -83,9 +83,15 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, 
         1. "tasks": an array of objects containing "task_name" and "due_date" (YYYY-MM-DD).
         2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
         
+        CRITICAL COMPREHENSIVE ROADMAP RULES:
+        - DO NOT compress the schedule into a high-level list of only 10 rows.
+        - For EVERY single assignment, subject module, or code lab extracted in your "tasks" list, you MUST generate a sequence of 5 to 8 separate, chronological daily study sessions leading up to its deadline.
+        - Break down your approach day-by-day (e.g., instead of just writing 'Study Subject A', break it down into 'Subject A: Unit 1 Theory Review', 'Subject A: Code Implementation Practice', 'Subject A: Optimization & Debugging Check', 'Subject A: Final Mock Review Run').
+        - This means your final "study_plan" array MUST contain an exhaustive, fully expanded list of distinct chronological rows tracking continuous student progress over multiple weeks.
+        
         USER AVAILABILITY CONSTRAINTS:
         - The student is ONLY free to study between {start_hr} and {end_hr}. Every generated 'time_slot' value must fall strictly within this window.
-        - Assume the current date is June 2026. Realistically space out individual checkpoints across distinct days.
+        - Assume the current date is June 2026. Realistically space out individual checkpoints sequentially across separate days.
         - Dedicated capacity: {hours} hours per day at a '{intensity}' intensity pace.
         - {weekend_rule}
         - All 'due_date' and 'scheduled_date' fields MUST use 'YYYY-MM-DD' format.
@@ -94,14 +100,13 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, 
         {cleaned_text}
         """
 
-        # Call Groq's flagship open-source inference system
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are a backend database parser. Output raw JSON objects matching the schema instructions. Do not write conversational explanations or text intros."},
+                {"role": "system", "content": "You are an itemized academic backend tracker. Your primary purpose is to split high-level syllabus text into extensive, daily micro-milestones. Never combine dates or group courses into single placeholder rows. Output raw JSON objects matching the schema requirements perfectly."},
                 {"role": "user", "content": prompt}
             ],
-            response_format={"type": "json_object"}  # Forces Groq to return clean database arrays
+            response_format={"type": "json_object"}  
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
@@ -230,7 +235,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Roadmap loaded securely via ultra-low-latency Groq LPUs.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Comprehensive granular roadmap loaded via high-speed Groq inference engines.</p>
                 </div>
             </div>
         """)
