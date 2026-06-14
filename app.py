@@ -65,32 +65,27 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- TOKEN-OPTIMIZED COMPRESSED SCHEMA GENERATOR ---
-def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
+# --- ENGINE ADVANCEMENT: SMART FILTERED AI DISPATCHER ---
+def extract_syllabus_with_ai(condensed_syllabus_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = Groq()
-        
-        cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
-        if len(cleaned_text) > 20000:
-            cleaned_text = cleaned_text[:20000]
-            
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
-        # We compress the JSON output structure to 1-letter keys to save massive token limits
         prompt = f"""
-        You are an elite academic strategy coach. Analyze the given syllabus text and output a valid JSON string object.
+        You are an elite academic strategy coach. Analyze the filtered syllabus data and output a valid JSON string object.
         The JSON object must contain exactly two array fields:
         1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
         2. "study_plan": an array of objects containing:
            - "d": scheduled date (YYYY-MM-DD)
            - "t": time slot window
-           - "f": focus topic
+           - "f": focus topic (specific concept/chapter name)
            - "a": suggested actionable item
            - "h": hours allocated (integer)
         
-        CRITICAL PERFORMANCE RULE:
-        - Generate an exhaustive, massive daily study roadmap with separate rows for separate days.
-        - Create a continuous chain of 80 to 120 separate daily rows tracing student progress over the entire semester leading to dates.
+        CRITICAL OUTPUT EXTRACTION RULES:
+        - NEVER write generic placeholder lines like 'Read Unit-I' or 'Solve questions' repeatedly.
+        - Look deeply into the syllabus text rows, extract the actual, specific, unique technical topic or lesson names (e.g., 'Object Oriented Inheritance', 'Matrix Inverses', 'Memory Management pointer layouts', 'SQL Join operations'), and space them out chronologically across separate days.
+        - Generate a rich, long, continuous chain of daily study milestones tracing true academic progression.
         
         USER AVAILABILITY CONSTRAINTS:
         - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
@@ -99,13 +94,13 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, 
         - {weekend_rule}
         
         Syllabus Text:
-        {cleaned_text}
+        {condensed_syllabus_text}
         """
 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are a dense database logging script. Output raw JSON arrays matching the requested compressed single-character field keys perfectly. Never compress the row counts; generate as many daily timeline items as possible."},
+                {"role": "system", "content": "You are an itemized academic extractor. You must build an extensive, highly specific calendar roadmap using the precise technical lesson concepts provided in the syllabus text. Avoid repeating template phrases. Output a valid compressed JSON object matching the requested schema rules perfectly."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"}  
@@ -169,27 +164,45 @@ with right_panel:
             progress_bar = st.progress(0)
             status_message = st.empty()
             
-            # Phase 1: File Reading
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Reading document layout strings via PyMuPDF context...</p>', unsafe_allow_html=True)
+            # Phase 1: File Reading & Keyword Context Condensing
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing pages and isolating key roadmap concepts...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
+            
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
             full_text = ""
             for page in doc:
                 full_text += page.get_text()
+            
+            # --- THE MAGIC WORKHORSE: HIGH-DENSITY LINE FILTER ---
+            filtered_lines = []
+            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "csa", "sec"]
+            
+            for line in full_text.split("\n"):
+                clean_line = line.strip()
+                # Keep lines that match academic topics or lines that contain numbers/dates
+                if any(kw in clean_line.lower() for kw in academic_keywords) or (len(clean_line) > 12 and any(char.isdigit() for char in clean_line)):
+                    filtered_lines.append(clean_line)
+            
+            condensed_syllabus = "\n".join(filtered_lines)
+            
+            # Safe truncation constraint for Groq payload gate
+            if len(condensed_syllabus) > 22000:
+                condensed_syllabus = condensed_syllabus[:22000]
+            
             time.sleep(0.4)
             
-            if not full_text.strip():
+            if not condensed_syllabus.strip():
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Unreadable PDF Error:** This document contains 0 selectable text characters.")
+                st.error("❌ **Unreadable PDF Error:** Could not extract meaningful academic timeline blocks from this document structure.")
                 st.stop()
             
             # Phase 2: Groq Engine Call
-            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting text arrays to high-speed Groq LPU cores...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Dispatching dense dataset to high-speed Groq LPU cores...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
-            raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends, string_from, string_until)
+            raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
             
             if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
                 progress_bar.empty()
@@ -204,20 +217,19 @@ with right_panel:
                 st.error("⚠️ An unhandled exception occurred inside the Groq API gateway.")
                 st.stop()
             
-            # Phase 3: Matrix Restructuring & Python De-compression
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Populating database frames and sorting clock slots...</p>', unsafe_allow_html=True)
+            # Phase 3: Matrix Restructuring
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Structuring deep lesson metrics and sorting clock slots...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             
-            # Re-map 1-letter keys safely back to full clean UI display layout parameters
-            mapped_tasks = [{"task_name": item.get("n", "Unknown"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
+            mapped_tasks = [{"task_name": item.get("n", "Unknown Milestone"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
             
             mapped_plan = [
                 {
                     "Status": False,
                     "Scheduled Date": item.get("d", "2026-06-15"),
-                    "Time Slot": item.get("t", "06:00 PM - 07:00 PM"),  
-                    "Focus Topic": item.get("f", "Topic Review"),
-                    "Suggested Action": item.get("a", "Read notes"),
+                    "Time Slot": item.get("t", "06:00 PM - 08:00 PM"),  
+                    "Focus Topic": item.get("f", "Topic Exploration"),
+                    "Suggested Action": item.get("a", "Review lecture parameters"),
                     "Hours Allocated": item.get("h", 2)
                 } for item in raw_ai_output.get("study_plan", [])
             ]
@@ -243,7 +255,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Roadmap loaded securely via ultra-low-latency Groq LPUs.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Detailed lesson roadmap successfully parsed via high-density context sorting.</p>
                 </div>
             </div>
         """)
