@@ -64,37 +64,39 @@ def generate_ics_file(study_dataframe):
                 
     ics_text += f"END:VCALENDAR"
     return ics_text
-# --- OPTIMIZED FOR GROQ SIZE LIMITS ---
+
+# --- TOKEN-OPTIMIZED COMPRESSED SCHEMA GENERATOR ---
 def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = Groq()
         
-        # Clean up binary anomalies
         cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
-        
-        # CRITICAL GROQ FIX: Lowering truncation size from 40k to 18k characters 
-        # prevents the 413 error while preserving all core dates and topics.
-        if len(cleaned_text) > 18000:
-            cleaned_text = cleaned_text[:18000]
+        if len(cleaned_text) > 20000:
+            cleaned_text = cleaned_text[:20000]
             
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
+        # We compress the JSON output structure to 1-letter keys to save massive token limits
         prompt = f"""
         You are an elite academic strategy coach. Analyze the given syllabus text and output a valid JSON string object.
-        The JSON object must contain two primary array fields matching this exact structural layout:
-        1. "tasks": an array of objects containing "task_name" and "due_date" (YYYY-MM-DD).
-        2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
+        The JSON object must contain exactly two array fields:
+        1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
+        2. "study_plan": an array of objects containing:
+           - "d": scheduled date (YYYY-MM-DD)
+           - "t": time slot window
+           - "f": focus topic
+           - "a": suggested actionable item
+           - "h": hours allocated (integer)
         
-        CRITICAL COMPREHENSIVE ROADMAP RULES:
-        - Generate an extensive, itemized study roadmap with separate rows for separate days.
-        - For EVERY task or module extracted, create a step-by-step sequence of detailed study blocks leading up to its deadline.
-        - Break topics down day-by-day (e.g., 'Unit 1 Core Theory', 'Lab Implementation Practice', 'Debugging Check').
+        CRITICAL PERFORMANCE RULE:
+        - Generate an exhaustive, massive daily study roadmap with separate rows for separate days.
+        - Create a continuous chain of 80 to 120 separate daily rows tracing student progress over the entire semester leading to dates.
         
         USER AVAILABILITY CONSTRAINTS:
-        - Study window: strictly between {start_hr} and {end_hr}.
-        - Max capacity: {hours} hours per day at a '{intensity}' intensity pace.
+        - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
+        - Assume the current date is June 2026. Space rows out sequentially across separate months.
+        - Capacity: {hours} hours per day at a '{intensity}' pace.
         - {weekend_rule}
-        - All dates must use 'YYYY-MM-DD' format.
         
         Syllabus Text:
         {cleaned_text}
@@ -103,7 +105,7 @@ def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are an itemized academic backend tracker. Your primary purpose is to split high-level syllabus text into extensive, daily micro-milestones. Never combine dates or group courses into single placeholder rows. Output raw JSON objects matching the schema requirements perfectly."},
+                {"role": "system", "content": "You are a dense database logging script. Output raw JSON arrays matching the requested compressed single-character field keys perfectly. Never compress the row counts; generate as many daily timeline items as possible."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"}  
@@ -180,7 +182,7 @@ with right_panel:
             if not full_text.strip():
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Unreadable PDF Error:** This document contains 0 selectable text characters. Please use a native digital text PDF.")
+                st.error("❌ **Unreadable PDF Error:** This document contains 0 selectable text characters.")
                 st.stop()
             
             # Phase 2: Groq Engine Call
@@ -202,21 +204,27 @@ with right_panel:
                 st.error("⚠️ An unhandled exception occurred inside the Groq API gateway.")
                 st.stop()
             
-            # Phase 3: Restructuring
+            # Phase 3: Matrix Restructuring & Python De-compression
             status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Populating database frames and sorting clock slots...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
+            
+            # Re-map 1-letter keys safely back to full clean UI display layout parameters
+            mapped_tasks = [{"task_name": item.get("n", "Unknown"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
+            
+            mapped_plan = [
+                {
+                    "Status": False,
+                    "Scheduled Date": item.get("d", "2026-06-15"),
+                    "Time Slot": item.get("t", "06:00 PM - 07:00 PM"),  
+                    "Focus Topic": item.get("f", "Topic Review"),
+                    "Suggested Action": item.get("a", "Read notes"),
+                    "Hours Allocated": item.get("h", 2)
+                } for item in raw_ai_output.get("study_plan", [])
+            ]
+            
             st.session_state["ai_data"] = {
-                "tasks": raw_ai_output["tasks"],
-                "study_plan": [
-                    {
-                        "Status": False,
-                        "Scheduled Date": item["scheduled_date"],
-                        "Time Slot": item["time_slot"],  
-                        "Focus Topic": item["focus_topic"],
-                        "Suggested Action": item["suggested_action"],
-                        "Hours Allocated": item["hours_allocated"]
-                    } for item in raw_ai_output["study_plan"]
-                ]
+                "tasks": mapped_tasks,
+                "study_plan": mapped_plan
             }
             time.sleep(0.4)
             
@@ -235,7 +243,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Comprehensive granular roadmap loaded via high-speed Groq inference engines.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Roadmap loaded securely via ultra-low-latency Groq LPUs.</p>
                 </div>
             </div>
         """)
