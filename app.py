@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, time as dt_time
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
-from groq import Groq  
+from openai import OpenAI  # OpenRouter utilizes the universal OpenAI client format
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -65,42 +65,49 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- ENGINE ADVANCEMENT: SMART FILTERED AI DISPATCHER ---
-def extract_syllabus_with_ai(condensed_syllabus_text, hours, intensity, no_weekends, start_hr, end_hr):
+# --- OPENROUTER FREE-TIER PROCESSING ENGINE ---
+def extract_syllabus_with_ai(raw_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
-        client = Groq()
+        # Initialize client routed directly through OpenRouter's cloud router
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=st.secrets["OPENROUTER_API_KEY"]
+        )
+        
+        cleaned_text = raw_text.encode("utf-8", errors="ignore").decode("utf-8")
+        # OpenRouter's input parameters allow us to expand the text window comfortably back to 60k characters
+        if len(cleaned_text) > 60000:
+            cleaned_text = cleaned_text[:60000]
+            
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
         prompt = f"""
-        You are an elite academic strategy coach. Analyze the filtered syllabus data and output a valid JSON string object.
+        You are an elite academic strategy coach. Analyze the given syllabus text and output a valid JSON string object.
         The JSON object must contain exactly two array fields:
-        1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
-        2. "study_plan": an array of objects containing:
-           - "d": scheduled date (YYYY-MM-DD)
-           - "t": time slot window
-           - "f": focus topic (specific concept/chapter name)
-           - "a": suggested actionable item
-           - "h": hours allocated (integer)
+        1. "tasks": an array of objects containing "task_name" and "due_date" (YYYY-MM-DD).
+        2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
         
         CRITICAL OUTPUT EXTRACTION RULES:
         - NEVER write generic placeholder lines like 'Read Unit-I' or 'Solve questions' repeatedly.
         - Look deeply into the syllabus text rows, extract the actual, specific, unique technical topic or lesson names (e.g., 'Object Oriented Inheritance', 'Matrix Inverses', 'Memory Management pointer layouts', 'SQL Join operations'), and space them out chronologically across separate days.
-        - Generate a rich, long, continuous chain of daily study milestones tracing true academic progression.
+        - Generate an exhaustive, massive daily study roadmap with separate rows for separate days, creating a long continuous chain of 80 to 120 separate daily rows tracing true academic progression.
         
         USER AVAILABILITY CONSTRAINTS:
-        - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
+        - Study window: strictly between {start_hr} and {end_hr}. Every generated 'time_slot' value must fall within this window.
         - Assume the current date is June 2026. Space rows out sequentially across separate months.
         - Capacity: {hours} hours per day at a '{intensity}' pace.
         - {weekend_rule}
+        - All dates must use 'YYYY-MM-DD' format.
         
         Syllabus Text:
-        {condensed_syllabus_text}
+        {cleaned_text}
         """
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            # Using OpenRouter's permanently free high-capacity Gemini endpoint wrapper
+            model="google/gemini-2.5-flash:free",
             messages=[
-                {"role": "system", "content": "You are an itemized academic extractor. You must build an extensive, highly specific calendar roadmap using the precise technical lesson concepts provided in the syllabus text. Avoid repeating template phrases. Output a valid compressed JSON object matching the requested schema rules perfectly."},
+                {"role": "system", "content": "You are a structural backend database compiler. Output raw JSON code matching the requested array schemas perfectly. Do not include conversational text descriptions or markdown wrappers outside the JSON structure."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"}  
@@ -164,79 +171,56 @@ with right_panel:
             progress_bar = st.progress(0)
             status_message = st.empty()
             
-            # Phase 1: File Reading & Keyword Context Condensing
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing pages and isolating key roadmap concepts...</p>', unsafe_allow_html=True)
+            # Phase 1: File Reading
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Reading document layout strings via PyMuPDF context...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
-            
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
             full_text = ""
             for page in doc:
                 full_text += page.get_text()
-            
-            # --- THE MAGIC WORKHORSE: HIGH-DENSITY LINE FILTER ---
-            filtered_lines = []
-            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "csa", "sec"]
-            
-            for line in full_text.split("\n"):
-                clean_line = line.strip()
-                # Keep lines that match academic topics or lines that contain numbers/dates
-                if any(kw in clean_line.lower() for kw in academic_keywords) or (len(clean_line) > 12 and any(char.isdigit() for char in clean_line)):
-                    filtered_lines.append(clean_line)
-            
-            condensed_syllabus = "\n".join(filtered_lines)
-            
-            # Safe truncation constraint for Groq payload gate
-            if len(condensed_syllabus) > 22000:
-                condensed_syllabus = condensed_syllabus[:22000]
-            
             time.sleep(0.4)
             
-            if not condensed_syllabus.strip():
+            if not full_text.strip():
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Unreadable PDF Error:** Could not extract meaningful academic timeline blocks from this document structure.")
+                st.error("❌ **Unreadable PDF Error:** This document contains 0 selectable text characters.")
                 st.stop()
             
-            # Phase 2: Groq Engine Call
-            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Dispatching dense dataset to high-speed Groq LPU cores...</p>', unsafe_allow_html=True)
+            # Phase 2: OpenRouter Call
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Routing dataset through high-capacity OpenRouter server clusters...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
-            raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
+            raw_ai_output = extract_syllabus_with_ai(full_text, study_hours, focus_level, skip_weekends, string_from, string_until)
             
             if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Groq Core API Refusal Code:**")
+                st.error("❌ **OpenRouter Core API Refusal Code:**")
                 st.code(raw_ai_output["details"], language="text")
                 st.stop()
 
             if raw_ai_output is None:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("⚠️ An unhandled exception occurred inside the Groq API gateway.")
+                st.error("⚠️ An unhandled exception occurred inside the OpenRouter API gateway.")
                 st.stop()
             
-            # Phase 3: Matrix Restructuring
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Structuring deep lesson metrics and sorting clock slots...</p>', unsafe_allow_html=True)
+            # Phase 3: Restructuring
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Populating database frames and sorting clock slots...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
-            
-            mapped_tasks = [{"task_name": item.get("n", "Unknown Milestone"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
-            
-            mapped_plan = [
-                {
-                    "Status": False,
-                    "Scheduled Date": item.get("d", "2026-06-15"),
-                    "Time Slot": item.get("t", "06:00 PM - 08:00 PM"),  
-                    "Focus Topic": item.get("f", "Topic Exploration"),
-                    "Suggested Action": item.get("a", "Review lecture parameters"),
-                    "Hours Allocated": item.get("h", 2)
-                } for item in raw_ai_output.get("study_plan", [])
-            ]
-            
             st.session_state["ai_data"] = {
-                "tasks": mapped_tasks,
-                "study_plan": mapped_plan
+                "tasks": raw_ai_output["tasks"],
+                "study_plan": [
+                    {
+                        "Status": False,
+                        "Scheduled Date": item["scheduled_date"],
+                        "Time Slot": item["time_slot"],  
+                        "Focus Topic": item["focus_topic"],
+                        "Suggested Action": item["suggested_action"],
+                        "Hours Allocated": item["hours_allocated"]
+                    } for item in raw_ai_output["study_plan"]
+                ]
             }
             time.sleep(0.4)
             
@@ -255,7 +239,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Detailed lesson roadmap successfully parsed via high-density context sorting.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Comprehensive detailed schedule generated via OpenRouter Free Tier clusters.</p>
                 </div>
             </div>
         """)
