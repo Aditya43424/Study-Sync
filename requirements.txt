@@ -3,5 +3,5 @@ requests
 streamlit-lottie
 pymupdf
 pandas
-groq
+openai
 pydantic
