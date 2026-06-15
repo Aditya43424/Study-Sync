@@ -65,7 +65,7 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- DENSELY PACKED OPENROUTER FREE API DISPATCHER ---
+# --- OPENROUTER HIGH-AVAILABILITY ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = OpenAI(
@@ -82,9 +82,8 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
         
         CRITICAL OUTPUT EXTRACTION RULES:
-        - NEVER write generic placeholder lines like 'Read Unit-I' repeatedly.
-        - Look closely at the course names, codes, and lesson text details provided. Map out the actual specific technical concept topics (e.g., 'Object Oriented Polmorphism', 'Matrix Determinants', 'SQL Database Joins', 'C Programming Syntaxes') day-by-day.
-        - Generate an extensive, deep daily study roadmap with separate rows for separate days. Produce a long continuous sequence of 70 to 110 separate rows to cover the full timeline comprehensively.
+        - Extract specific, unique technical lesson topic/chapter names from the document text and space them out chronologically across separate days.
+        - Generate an extensive daily study roadmap with separate rows for separate days. Produce 60 to 100 separate rows to cover the timeline comprehensively. Do not truncate the plan early.
         
         USER AVAILABILITY CONSTRAINTS:
         - Study window: strictly between {start_hr} and {end_hr}. Every generated 'time_slot' value must fall within this window.
@@ -98,7 +97,8 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         """
 
         response = client.chat.completions.create(
-            model="meta-llama/llama-3.3-70b-instruct:free",
+            # SWAPPED SLUG: Pointing to the high-bandwidth, stable free Llama-3-8B endpoint
+            model="meta-llama/llama-3-8b-instruct:free",
             messages=[
                 {"role": "system", "content": "You are a structural backend database compiler. Output raw JSON code matching the requested array schemas perfectly. Do not include conversational text descriptions or markdown wrappers outside the JSON structure."},
                 {"role": "user", "content": prompt}
@@ -164,8 +164,8 @@ with right_panel:
             progress_bar = st.progress(0)
             status_message = st.empty()
             
-            # Phase 1: File Reading and High-Density Condensing
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing PDF lines and filtering out administrative text blocks...</p>', unsafe_allow_html=True)
+            # Phase 1: File Reading and Condensing
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing PDF lines and isolating academic parameters...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
@@ -173,8 +173,7 @@ with right_panel:
             for page in doc:
                 full_text += page.get_text()
                 
-            # --- HIGH-DENSITY LINE CONDUIT FILTER ---
-            # Automatically extracts pure topic rows across all 50 pages while removing layout fluff
+            # HIGH-DENSITY FILTER
             filtered_lines = []
             academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "csa", "sec"]
             
@@ -184,8 +183,8 @@ with right_panel:
                     filtered_lines.append(clean_line)
             
             condensed_syllabus = "\n".join(filtered_lines)
-            if len(condensed_syllabus) > 20000:
-                condensed_syllabus = condensed_syllabus[:20000]
+            if len(condensed_syllabus) > 15000:
+                condensed_syllabus = condensed_syllabus[:15000]
                 
             time.sleep(0.4)
             
@@ -196,7 +195,7 @@ with right_panel:
                 st.stop()
             
             # Phase 2: OpenRouter Call
-            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Routing compressed data to OpenRouter free clusters...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Routing compressed data to high-availability OpenRouter free tiers...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
@@ -247,7 +246,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Detailed 100+ line lesson roadmap loaded securely via OpenRouter.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Detailed lesson roadmap loaded securely via high-availability free clusters.</p>
                 </div>
             </div>
         """)
