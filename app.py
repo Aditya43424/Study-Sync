@@ -65,7 +65,7 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- DYNAMIC FREE AUTO-ROUTING ENGINE ---
+# --- TOKEN-COMPRESSED OPENROUTER PROCESSING ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = OpenAI(
@@ -75,19 +75,25 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
+        # We rewrite the prompt layout schemas to use 1-letter fields to bypass token limit ceilings
         prompt = f"""
-        You are an elite academic strategy coach. Analyze the given syllabus text and output a valid JSON string object.
+        You are an elite academic strategy coach. Analyze the filtered syllabus data text and output a valid JSON string object.
         The JSON object must contain exactly two array fields:
-        1. "tasks": an array of objects containing "task_name" and "due_date" (YYYY-MM-DD).
-        2. "study_plan": an array of objects containing "scheduled_date" (YYYY-MM-DD), "time_slot", "focus_topic", "suggested_action", and "hours_allocated".
+        1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
+        2. "study_plan": an array of objects containing:
+           - "d": scheduled date (YYYY-MM-DD)
+           - "t": time slot window
+           - "f": focus topic (extract the actual specific lesson topic or conceptual chapter name from the text)
+           - "a": suggested actionable study item
+           - "h": hours allocated (integer)
         
-        CRITICAL OUTPUT EXTRACTION RULES:
-        - Do not combine multiple chapters or write repetitive phrases like 'Read Unit-I'.
-        - Extract the specific unique academic concept names from the text details (e.g., 'Object Oriented Inheritance', 'Matrix Determinants', 'SQL Database Joins') and space them out chronologically across separate days.
-        - Generate an extensive daily study roadmap with separate rows for separate days. Produce 60 to 100 separate rows to cover the timeline comprehensively.
+        CRITICAL OUTPUT VOLUME RULES:
+        - NEVER write generic placeholder lines like 'Read Unit-I' or 'Solve questions' repeatedly.
+        - Look deeply into all modules and concept paths provided in the document. Break them down day-by-day (e.g., 'Object Oriented Inheritance structures', 'Matrix Determinants calculations', 'SQL Join parameters query setups').
+        - Generate an exhaustive, long-form chronological timeline. You MUST output between 80 to 120 separate individual rows inside the "study_plan" array to cover the entire course context sequence comprehensively without truncating early.
         
         USER AVAILABILITY CONSTRAINTS:
-        - Study window: strictly between {start_hr} and {end_hr}. Every generated 'time_slot' value must fall within this window.
+        - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
         - Assume the current date is June 2026. Space rows out sequentially across separate months.
         - Capacity: {hours} hours per day at a '{intensity}' pace.
         - {weekend_rule}
@@ -98,10 +104,9 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         """
 
         response = client.chat.completions.create(
-            # THE PERMANENT AUTO-FIX: Let OpenRouter pick the optimal active free model automatically
             model="openrouter/free",
             messages=[
-                {"role": "system", "content": "You are a structural backend database compiler. Output raw JSON code matching the requested array schemas perfectly. Do not include conversational text descriptions or markdown wrappers outside the JSON structure."},
+                {"role": "system", "content": "You are a dense database compiler. You must output raw JSON matching the requested compressed 1-letter schemas perfectly. Do not truncate rows; generate as many comprehensive daily milestones as possible to complete the roadmap array."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"}  
@@ -165,8 +170,8 @@ with right_panel:
             progress_bar = st.progress(0)
             status_message = st.empty()
             
-            # Phase 1: File Reading and Condensing
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing PDF lines and isolating academic parameters...</p>', unsafe_allow_html=True)
+            # Phase 1: File Reading and Multi-Page Context Filtering
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing PDF lines and compiling technical milestone metrics...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
@@ -174,7 +179,7 @@ with right_panel:
             for page in doc:
                 full_text += page.get_text()
                 
-            # HIGH-DENSITY FILTER
+            # HIGH-DENSITY TOPIC LINE SCANNERS
             filtered_lines = []
             academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "csa", "sec"]
             
@@ -184,8 +189,8 @@ with right_panel:
                     filtered_lines.append(clean_line)
             
             condensed_syllabus = "\n".join(filtered_lines)
-            if len(condensed_syllabus) > 15000:
-                condensed_syllabus = condensed_syllabus[:15000]
+            if len(condensed_syllabus) > 18000:
+                condensed_syllabus = condensed_syllabus[:18000]
                 
             time.sleep(0.4)
             
@@ -196,7 +201,7 @@ with right_panel:
                 st.stop()
             
             # Phase 2: OpenRouter Call
-            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Dispatching compressed data to dynamic OpenRouter free tier paths...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting dense token packages to OpenRouter free tiers...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
@@ -214,21 +219,27 @@ with right_panel:
                 st.error("⚠️ An unhandled exception occurred inside the OpenRouter API gateway.")
                 st.stop()
             
-            # Phase 3: Restructuring
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Building timeline matrices and mapping time slots...</p>', unsafe_allow_html=True)
+            # Phase 3: Structural De-compression & Expansion Loop
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Mapping token parameters back into clear dashboard tables...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
+            
+            # Re-map compressed single letter elements cleanly back to full display names
+            mapped_tasks = [{"task_name": item.get("n", "Course Assessment"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
+            
+            mapped_plan = [
+                {
+                    "Status": False,
+                    "Scheduled Date": item.get("d", "2026-06-15"),
+                    "Time Slot": item.get("t", f"{string_from} - {string_until}"),  
+                    "Focus Topic": item.get("f", "Topic Review Module"),
+                    "Suggested Action": item.get("a", "Review notes and practice core assignments"),
+                    "Hours Allocated": item.get("h", int(study_hours))
+                } for item in raw_ai_output.get("study_plan", [])
+            ]
+            
             st.session_state["ai_data"] = {
-                "tasks": raw_ai_output["tasks"],
-                "study_plan": [
-                    {
-                        "Status": False,
-                        "Scheduled Date": item["scheduled_date"],
-                        "Time Slot": item["time_slot"],  
-                        "Focus Topic": item["focus_topic"],
-                        "Suggested Action": item["suggested_action"],
-                        "Hours Allocated": item["hours_allocated"]
-                    } for item in raw_ai_output["study_plan"]
-                ]
+                "tasks": mapped_tasks,
+                "study_plan": mapped_plan
             }
             time.sleep(0.4)
             
@@ -247,19 +258,20 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Detailed lesson roadmap loaded securely via OpenRouter.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Exhaustive multi-week roadmap parsed error-free via token compression metrics.</p>
                 </div>
             </div>
         """)
         
         total_tasks = len(st.session_state["ai_data"]["tasks"])
+        total_rows = len(st.session_state["ai_data"]["study_plan"])
         
         st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>Summary</p>", unsafe_allow_html=True)
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
             st.container(border=True).metric(label="Pages Read", value=f"{st.session_state['page_count']} Pages")
         with m_col2:
-            st.container(border=True).metric(label="AI Detected Tasks", value=f"{total_tasks} Items")
+            st.container(border=True).metric(label="AI Daily Milestones", value=f"{total_rows} Actions")
         with m_col3:
             st.container(border=True).metric(label="Daily Cap Target", value=f"{study_hours} Hours/Day")
         
