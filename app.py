@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, time as dt_time
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
-from groq import Groq  # Fixed: Back to native Groq client
+from groq import Groq  
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -65,13 +65,12 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- TOKEN-SQUEEZED HIGH-VOLUME GROQ ENGINE ---
+# --- UNLOCKED HIGH-VOLUME GROQ CORE ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
-        # Enforcing ultra-short 1-letter dictionary schemas lets Llama write 3x more data rows before hitting limits
         prompt = f"""
         You are an elite academic strategy coach. Analyze the filtered syllabus data text and output a valid JSON string object.
         The JSON object must contain exactly two array fields:
@@ -105,7 +104,9 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 {"role": "system", "content": "You are a dense database logging script. Output raw JSON arrays matching the requested compressed single-character field keys perfectly. Never compress the row counts; generate as many comprehensive daily timeline items as possible to complete the matrix array."},
                 {"role": "user", "content": prompt}
             ],
-            response_format={"type": "json_object"}  
+            response_format={"type": "json_object"},
+            # CRITICAL FIX: Explicitly unlocking the full 8,192 token output generation limit
+            max_tokens=8192  
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
@@ -197,7 +198,7 @@ with right_panel:
                 st.stop()
             
             # Phase 2: Groq Engine Call
-            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting dense token packages to Groq hardware cores...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting dense token packages to un-capped Groq hardware cores...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
@@ -216,10 +217,9 @@ with right_panel:
                 st.stop()
             
             # Phase 3: Structural De-compression & Expansion Loop
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating compressed keys back to clear dashboard tables...</p>', unsafe_allow_html=True)
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating structural shorthand keys back to clear visual datagrides...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             
-            # Re-map 1-letter response schema values smoothly back to user interface labels
             mapped_tasks = [{"task_name": item.get("n", "Course Milestone"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
             
             mapped_plan = [
@@ -239,7 +239,7 @@ with right_panel:
             }
             time.sleep(0.4)
             
-            # Phase 4: Finalizing Layout
+            # Phase 4: Sync Interfaces
             status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Synchronizing interactive checklist frameworks...</p>', unsafe_allow_html=True)
             progress_bar.progress(100)
             time.sleep(0.3)
