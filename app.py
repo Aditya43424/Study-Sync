@@ -9,8 +9,7 @@ from datetime import datetime, timedelta, time as dt_time
 from streamlit_lottie import st_lottie
 import streamlit.components.v1 as components
 from pydantic import BaseModel
-from google import genai  # Official Google GenAI SDK
-from google.genai import types
+from groq import Groq  # Native Groq Client Integration
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
@@ -19,22 +18,6 @@ if "ai_data" not in st.session_state:
     st.session_state["ai_data"] = None
 if "page_count" not in st.session_state:
     st.session_state["page_count"] = 0
-
-# Pydantic Structured Data Schemas
-class TaskSchema(BaseModel):
-    task_name: str
-    due_date: str
-
-class ScheduleSchema(BaseModel):
-    scheduled_date: str
-    time_slot: str  
-    focus_topic: str
-    suggested_action: str
-    hours_allocated: int
-
-class SyllabusOutput(BaseModel):
-    tasks: list[TaskSchema]
-    study_plan: list[ScheduleSchema]
 
 # 2. HELPER FUNCTIONS
 def load_lottie_url(url: str):
@@ -82,29 +65,34 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- NATIVE GOOGLE GEMINI CORE ENGINE ---
+# --- DUAL-DEFENSE COMPRESSED GROQ PROCESSING ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
-        # Securely binds with your native Google Studio Key from Secrets configuration
-        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-        
+        # Connects securely utilizing your dedicated Groq Cloud Secret Key
+        client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
         
+        # Enforce highly compressed object schemas to maximize output token limits
         prompt = f"""
-        You are an elite academic strategy coach. Analyze the given syllabus text.
+        You are an elite academic strategy coach. Analyze the filtered syllabus text and output a valid JSON string object.
+        The JSON object must contain exactly two array fields:
+        1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
+        2. "study_plan": an array of objects containing:
+           - "d": scheduled date (YYYY-MM-DD)
+           - "t": time slot window string
+           - "f": focus topic (extract specific technical concept/chapter names from the text details)
+           - "a": suggested actionable study item
+           - "h": hours allocated (integer)
         
-        STEP 1: Extract all major assignments, exams, and milestones with their absolute due dates.
-        STEP 2: Build a comprehensive, exhaustive chronological study roadmap leading up to those dates.
+        CRITICAL ROW GENERATION CONSTRAINT:
+        - Do not compress rows or provide brief summaries.
+        - Look deeply into the course requirements. Map out separate rows for separate days.
+        - You MUST generate between 70 to 110 separate row entries inside the "study_plan" array to build an exhaustive daily study path across multiple weeks without cutting off early.
         
-        CRITICAL VOLUME RULES:
-        - Do not compress the timeline or give high-level summaries. 
-        - Break down your approach day-by-day with highly specific technical topic names extracted from the syllabus modules.
-        - Generate an extensive, complete daily study timeline, providing between 70 to 120 separate individual rows to cover the full semester context thoroughly without cutting off early.
-        
-        USER CONSTRAINTS:
-        - Availability window: The student is ONLY free to study between {start_hr} and {end_hr}. Every generated 'time_slot' must fall strictly within this window.
-        - Assume the current date is June 2026. Realistically space out items sequentially across separate weeks and months.
-        - Capacity parameters: Dedicated capacity of {hours} hours per day matching a '{intensity}' learning pace.
+        USER AVAILABILITY CONSTRAINTS:
+        - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
+        - Assume the current date is June 2026. Space rows out sequentially across separate months.
+        - Capacity: {hours} hours per day at a '{intensity}' pace.
         - {weekend_rule}
         - All dates must use 'YYYY-MM-DD' format.
         
@@ -112,15 +100,15 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         {condensed_text}
         """
 
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=SyllabusOutput,
-            ),
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are a precise database logger. Output raw JSON code matching the requested compressed 1-letter schemas perfectly. Do not include conversational explanations or introductory markdown."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}  
         )
-        return json.loads(response.text)
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         return {"error_mode_active": True, "details": str(e)}
 
@@ -173,14 +161,14 @@ with right_panel:
             available_duration_hours = (end_minutes - start_minutes) / 60
             
             if available_duration_hours < study_hours:
-                st.error(f"❌ **Configuration Conflict:** Your Availability Window ({available_duration_hours:.2f} hours) is shorter than your daily study target ({study_hours} hours).")
+                st.error(f"❌ **Configuration Conflict Error:** Your Availability Window ({available_duration_hours:.2f} hours) is shorter than your required study hours target ({study_hours} hours).")
                 st.stop()
             
             progress_bar = st.progress(0)
             status_message = st.empty()
             
-            # Phase 1: File Reading and Filtering
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Extraction of document layers via PyMuPDF string buffers...</p>', unsafe_allow_html=True)
+            # Phase 1: High-Density File Analysis
+            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Reading document parameters and executing line filters...</p>', unsafe_allow_html=True)
             progress_bar.progress(25)
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
@@ -188,7 +176,7 @@ with right_panel:
             for page in doc:
                 full_text += page.get_text()
                 
-            # HIGH-DENSITY ACADEMIC TOPIC LINE FILTER
+            # HIGH-DENSITY RADICAL TOPIC SCRAIPER
             filtered_lines = []
             academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "csa", "sec"]
             
@@ -198,19 +186,21 @@ with right_panel:
                     filtered_lines.append(clean_line)
             
             condensed_syllabus = "\n".join(filtered_lines)
-            if len(condensed_syllabus) > 28000:
-                condensed_syllabus = condensed_syllabus[:28000]
+            
+            # Defense Cutoff: Prevents Groq 413 Payload size rejections
+            if len(condensed_syllabus) > 16000:
+                condensed_syllabus = condensed_syllabus[:16000]
                 
             time.sleep(0.4)
             
             if not condensed_syllabus.strip():
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Unreadable PDF Error:** Could not locate actionable learning metrics in this file layout.")
+                st.error("❌ **Unreadable PDF Structure Error:** Failed to isolate structural learning concepts from this document.")
                 st.stop()
             
-            # Phase 2: Native Gemini Cloud Handshake
-            status_message.markdown('<p class="progress-status-text">🧠 [50%] Phase 2: Generating structural optimization matrix via native Google Gemini systems...</p>', unsafe_allow_html=True)
+            # Phase 2: Groq Acceleration Node Call
+            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting compressed datasets to high-speed Groq processing clusters...</p>', unsafe_allow_html=True)
             progress_bar.progress(50)
             
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
@@ -218,36 +208,41 @@ with right_panel:
             if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("❌ **Google Gemini API Error Code Detected:**")
+                st.error("❌ **Groq Cloud API Exception Refusal Block:**")
                 st.code(raw_ai_output["details"], language="text")
-                st.info("💡 Pro-Tip: Make sure you created your API key inside a 'New Project' workspace container to refresh all token limits!")
                 st.stop()
 
             if raw_ai_output is None:
                 progress_bar.empty()
                 status_message.empty()
-                st.error("⚠️ An unhandled exception occurred inside the Google gateway.")
+                st.error("⚠️ An unhandled fallback exception transpired inside the remote engine gateway.")
                 st.stop()
             
-            # Phase 3: Matrix Structuring
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Compiling structured dataframe maps and allocating clock slots...</p>', unsafe_allow_html=True)
+            # Phase 3: Structural Matrix Expansion
+            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Decompressing response layers and mapping spreadsheet frames...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
+            
+            # Expands compressed single letter keys seamlessly back to full professional UI header values
+            mapped_tasks = [{"task_name": item.get("n", "Course Assessment"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
+            
+            mapped_plan = [
+                {
+                    "Status": False,
+                    "Scheduled Date": item.get("d", "2026-06-15"),
+                    "Time Slot": item.get("t", f"{string_from} - {string_until}"),  
+                    "Focus Topic": item.get("f", "Core Concept Exploration Module"),
+                    "Suggested Action": item.get("a", "Review technical documentation notes"),
+                    "Hours Allocated": item.get("h", int(study_hours))
+                } for item in raw_ai_output.get("study_plan", [])
+            ]
+            
             st.session_state["ai_data"] = {
-                "tasks": raw_ai_output["tasks"],
-                "study_plan": [
-                    {
-                        "Status": False,
-                        "Scheduled Date": item["scheduled_date"],
-                        "Time Slot": item["time_slot"],  
-                        "Focus Topic": item["focus_topic"],
-                        "Suggested Action": item["suggested_action"],
-                        "Hours Allocated": item["hours_allocated"]
-                    } for item in raw_ai_output["study_plan"]
-                ]
+                "tasks": mapped_tasks,
+                "study_plan": mapped_plan
             }
             time.sleep(0.4)
             
-            # Phase 4: Finalizing Layout
+            # Phase 4: Sync Interfaces
             status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Synchronizing interactive checklist frameworks...</p>', unsafe_allow_html=True)
             progress_bar.progress(100)
             time.sleep(0.3)
@@ -262,7 +257,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Exhaustive daily study timeline rendered cleanly via native Google Gemini cores.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Comprehensive detailed study roadmap compiled securely via Groq API hubs.</p>
                 </div>
             </div>
         """)
@@ -275,7 +270,7 @@ with right_panel:
         with m_col1:
             st.container(border=True).metric(label="Pages Read", value=f"{st.session_state['page_count']} Pages")
         with m_col2:
-            st.container(border=True).metric(label="AI Milestones", value=f"{total_milestones} Items")
+            st.container(border=True).metric(label="AI Daily Milestones", value=f"{total_milestones} Actions")
         with m_col3:
             st.container(border=True).metric(label="Daily Cap Target", value=f"{study_hours} Hours/Day")
         
