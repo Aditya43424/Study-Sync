@@ -105,7 +105,6 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            # CRITICAL FIX: Explicitly unlocking the full 8,192 token output generation limit
             max_tokens=8192  
         )
         return json.loads(response.choices[0].message.content)
@@ -186,8 +185,10 @@ with right_panel:
                     filtered_lines.append(clean_line)
             
             condensed_syllabus = "\n".join(filtered_lines)
-            if len(condensed_syllabus) > 16000:
-                condensed_syllabus = condensed_syllabus[:16000]
+            
+            # CRITICAL SAFETY OVERRIDE: Tightened character truncation to bypass 413 network rejections completely
+            if len(condensed_syllabus) > 7000:
+                condensed_syllabus = condensed_syllabus[:7000]
                 
             time.sleep(0.4)
             
