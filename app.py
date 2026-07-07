@@ -105,7 +105,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
-            max_tokens=5000
+            max_tokens=8192  
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
