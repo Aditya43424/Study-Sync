@@ -65,7 +65,7 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- UNLOCKED HIGH-VOLUME GROQ CORE ENGINE ---
+# --- UNLOCKED SEQUENTIAL GROQ ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
     try:
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
@@ -78,14 +78,19 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         2. "study_plan": an array of objects containing:
            - "d": scheduled date (YYYY-MM-DD)
            - "t": time slot window string
-           - "f": focus topic (extract the actual specific lesson topic or conceptual chapter name from the text)
+           - "f": focus topic (precise conceptual chapter or lesson name extracted from the text layout)
            - "a": suggested actionable study item
            - "h": hours allocated (integer)
         
+        CRITICAL LINEAR SEQUENCE RULE:
+        - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
+        - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters appear in the text document. 
+        - Start with the first topics listed in Unit 1 / Week 1, map those sequentially to your earliest calendar dates, and progressively move down through Unit 2, Unit 3, Unit 4, etc.
+        - Never skip ahead to later concepts or mix future modules into earlier study dates. Keep the schedule as sequential as the syllabus text content flow.
+        
         CRITICAL OUTPUT VOLUME RULES:
-        - NEVER write generic placeholder lines like 'Read Unit-I' or 'Solve questions' repeatedly.
-        - Look deeply into all modules and concept paths provided in the document text. Break topics down day-by-day (e.g., 'Object Oriented Inheritance structures', 'Matrix Determinants calculations', 'SQL Join parameters query setups').
-        - Generate an exhaustive, long-form chronological timeline. You MUST output between 80 to 120 separate individual rows inside the "study_plan" array to cover the entire course context sequence comprehensively without truncating early.
+        - Avoid writing generic text blocks or placeholder labels like 'Read Unit-I' repeatedly.
+        - Generate an extensive timeline containing between 80 to 120 separate individual entries inside the "study_plan" array to match the granular course scope without truncating early.
         
         USER AVAILABILITY CONSTRAINTS:
         - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
@@ -101,7 +106,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are a dense database logging script. Output raw JSON arrays matching the requested compressed single-character field keys perfectly. Never compress the row counts; generate as many comprehensive daily timeline items as possible to complete the matrix array."},
+                {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching the requested compressed single-character field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
@@ -186,7 +191,6 @@ with right_panel:
             
             condensed_syllabus = "\n".join(filtered_lines)
             
-            # CRITICAL SAFETY OVERRIDE: Tightened character truncation to bypass 413 network rejections completely
             if len(condensed_syllabus) > 7000:
                 condensed_syllabus = condensed_syllabus[:7000]
                 
@@ -255,7 +259,7 @@ with right_panel:
                 <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
                 <div style="display: flex; flex-direction: column;">
                     <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Exhaustive multi-week roadmap parsed error-free via Groq API optimization.</p>
+                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Strict linear chronological schedule rendered safely via Groq LPUs.</p>
                 </div>
             </div>
         """)
