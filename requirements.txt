@@ -5,3 +5,4 @@ pymupdf
 pandas
 groq
 pydantic
+firebase-admin
