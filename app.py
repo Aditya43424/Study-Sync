@@ -216,7 +216,7 @@ with left_panel:
     st.subheader("Student Profile")
     user_id = st.text_input("Enter Username / Roll Number:", value="Student_1").strip()
     
-    if st.button("📂 Load From Database(existing/Enter Name (New User)", use_container_width=True):
+    if st.button("📂 Load From Database(Existing User)/Enter Name (New User)", use_container_width=True):
         cloud_data = load_schedule_from_firebase(user_id)
         if cloud_data:
             st.session_state["ai_data"] = cloud_data
