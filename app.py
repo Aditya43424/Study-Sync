@@ -155,7 +155,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             CRITICAL LINEAR SEQUENCE RULE:
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
             - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters appear in the text document. 
-            - Start with the first topics listed in Unit 1 / Week 1, map those sequentially to your earliest calendar dates, and progressively move down through Unit 2, Unit 3, Unit 4, etc.
+            - Start with the first topics listed in Unit 1 / Week 1, map those sequentially to your earliest calendar dates, and progressively move down through Unit 2, Unit 3, Unit 4, Unit 5 etc.
             - Never skip ahead to later concepts or mix future modules into earlier study dates. Keep the schedule as sequential as the syllabus text content flow.
             
             CRITICAL OUTPUT VOLUME RULES:
@@ -213,7 +213,7 @@ st.markdown("---")
 left_panel, right_panel = st.columns([1, 2], gap="large")
 
 with left_panel:
-    st.subheader("👤 Student Profile")
+    st.subheader("Student Profile")
     user_id = st.text_input("Enter Username / Roll Number:", value="Student_1").strip()
     
     if st.button("📂 Load From Cloud Database", use_container_width=True):
