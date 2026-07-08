@@ -233,7 +233,7 @@ with left_panel:
 
     # ✨ NEW USER PERSPECTIVE: Native Cloud Profile Registration Window
     with st.popover("🆕 Create New Profile", use_container_width=True):
-        st.markdown("### Register Fresh Cloud Profile")
+        st.markdown("### Create New Profile")
         new_username = st.text_input("Choose Unique Username / Roll No:", key="new_reg_field").strip()
         
         if st.button("🚀 Register & Save in Cloud", use_container_width=True):
