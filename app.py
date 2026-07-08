@@ -211,12 +211,18 @@ st.markdown("---")
 
 # 5. SPLIT PANEL CONTROL INTERFACES
 left_panel, right_panel = st.columns([1, 2], gap="large")
-
 with left_panel:
-    st.subheader("Student Profile")
-    user_id = st.text_input("Enter Username / Roll Number:", value="Student_1").strip()
+    st.subheader("👤 Student Profile")
     
-    if st.button("📂 Load From Database(Existing User)/Enter Name (New User)", use_container_width=True):
+    # Track the active profile in session state so it can update dynamically
+    if "username_val" not in st.session_state:
+        st.session_state["username_val"] = "Aditya"
+        
+    user_id = st.text_input("Active Profile Name:", value=st.session_state["username_val"]).strip()
+    st.session_state["username_val"] = user_id  # Sync text box changes instantly
+
+    # Button A: Load existing profiles from the cloud
+    if st.button("📂 Load From Cloud Database", use_container_width=True):
         cloud_data = load_schedule_from_firebase(user_id)
         if cloud_data:
             st.session_state["ai_data"] = cloud_data
@@ -224,6 +230,28 @@ with left_panel:
             st.rerun()
         else:
             st.warning("No saved profile records found in Firestore for this user.")
+
+    # ✨ NEW USER PERSPECTIVE: Native Cloud Profile Registration Window
+    with st.popover("🆕 Create New Profile", use_container_width=True):
+        st.markdown("### Register Fresh Cloud Profile")
+        new_username = st.text_input("Choose Unique Username / Roll No:", key="new_reg_field").strip()
+        
+        if st.button("🚀 Register & Save in Cloud", use_container_width=True):
+            if new_username:
+                # Security Check: Ensure they don't overwrite an existing user's data
+                existing_profile = load_schedule_from_firebase(new_username)
+                if existing_profile:
+                    st.error("⚠️ This profile name already exists in Firebase! Please choose a unique name.")
+                else:
+                    # Create a fresh, empty document slot in your live Firestore database instantly
+                    save_success = save_schedule_to_firebase(new_username, [], [])
+                    if save_success:
+                        st.session_state["username_val"] = new_username  # Set as active profile
+                        st.success(f"🎉 Profile '{new_username}' registered successfully in Firebase!")
+                        time.sleep(1.5)
+                        st.rerun()
+            else:
+                st.warning("Please type a valid name string.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("⚙️ Configuration")
@@ -239,6 +267,7 @@ with left_panel:
         free_until = st.time_input("I am free until:", dt_time(21, 30)) 
         string_from = free_from.strftime("%I:%M %p")
         string_until = free_until.strftime("%I:%M %p")
+
 
 with right_panel:
     st.subheader("Drop your PDF here")
