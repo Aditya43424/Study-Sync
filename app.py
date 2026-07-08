@@ -232,7 +232,7 @@ with left_panel:
             st.warning("No saved profile records found in Firestore for this user.")
 
     # ✨ NEW USER PERSPECTIVE: Native Cloud Profile Registration Window
-    with st.popover("🆕 Create New Profile", use_container_width=True):
+    with st.popover("Create New Profile", use_container_width=True):
         st.markdown("### Create New Profile")
         new_username = st.text_input("Choose Unique Username / Roll No:", key="new_reg_field").strip()
         
