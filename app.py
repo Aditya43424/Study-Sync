@@ -94,7 +94,47 @@ def load_schedule_from_firebase(uid):
     except Exception as e:
         return None
 
-# --- CORE INTEL ENGINE (GROQ PARSER) ---
+# 2. CALENDAR GENERATION ROUTINE
+def generate_ics_file(study_dataframe):
+    nl = "\r\n"
+    current_timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    ics_text = f"BEGIN:VCALENDAR{nl}VERSION:2.0{nl}PRODID:-//Study Sync//Study Planner//EN{nl}CALSCALE:GREGORIAN{nl}"
+    
+    for _, row in study_dataframe.iterrows():
+        date_str = str(row['Scheduled Date']).strip()
+        try:
+            start_dt = datetime.strptime(date_str, "%Y-%m-%d")
+            end_dt = start_dt + timedelta(days=1)
+            
+            clean_start = start_dt.strftime("%Y%m%d")
+            clean_end = end_dt.strftime("%Y%m%d")
+            unique_event_id = str(uuid.uuid4())
+            
+            ics_text += f"BEGIN:VEVENT{nl}"
+            ics_text += f"UID:{unique_event_id}{nl}"
+            ics_text += f"DTSTAMP:{current_timestamp}{nl}"
+            ics_text += f"SUMMARY:📚 Focus [{row['Time Slot']}]: {row['Focus Topic']}{nl}"
+            ics_text += f"DESCRIPTION:Action: {row['Suggested Action']} | Allocated: {row['Hours Allocated']} hours.{nl}"
+            ics_text += f"DTSTART;VALUE=DATE:{clean_start}{nl}"
+            ics_text += f"DTEND;VALUE=DATE:{clean_end}{nl}"  
+            ics_text += f"END:VEVENT{nl}"
+        except Exception:
+            clean_date = date_str.replace("-", "").strip()
+            if len(clean_date) == 8 and clean_date.isdigit():
+                unique_event_id = str(uuid.uuid4())
+                ics_text += f"BEGIN:VEVENT{nl}"
+                ics_text += f"UID:{unique_event_id}{nl}"
+                ics_text += f"DTSTAMP:{current_timestamp}{nl}"
+                ics_text += f"SUMMARY:📚 Focus: {row['Focus Topic']}{nl}"
+                ics_text += f"DESCRIPTION:Action: {row['Suggested Action']}{nl}"
+                ics_text += f"DTSTART;VALUE=DATE:{clean_date}{nl}"
+                ics_text += f"DTEND;VALUE=DATE:{clean_date}{nl}"
+                ics_text += f"END:VEVENT{nl}"
+                
+    ics_text += f"END:VCALENDAR"
+    return ics_text
+
+# --- CHRONOLOGICAL EXPANSION GROQ ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
     max_retries = 3
     base_delay = 4
@@ -117,14 +157,15 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             CRITICAL LINEAR SEQUENCE RULE:
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
             - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
+            - When you encounter 'Semester 2' or 'Second Semester' milestones, look directly at the lines following it and extract the real technical lesson topics.
             
             STRICT FILLER BAN RULE:
-            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', or 'Final preparation for exams'.
-            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic found in the text.
+            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', 'Practice problems on new topics', or 'Final preparation for exams' repeatedly.
+            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic or practical concept found in the text.
             - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
             
             USER AVAILABILITY CONSTRAINTS:
-            - Study window: strictly between {start_hr} and {end_hr}.
+            - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
             - Assume the current date is June 2026. Space rows out sequentially across separate months.
             - Capacity: {hours} hours per day at a '{intensity}' pace.
             - {weekend_rule}
@@ -137,11 +178,12 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Maximize row generation count up to 120 distinct items."},
+                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=8192  
+                # CRITICAL BALANCE FIX: Reduced reservation to safely pass the 12k rate limit gate
+                max_tokens=6000  
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
@@ -171,8 +213,8 @@ if st.session_state["user_uid"] is None:
     
     with auth_tab1:
         with st.form("login_form"):
-            li_email = st.text_input("Email Address Address:")
-            li_password = st.text_input("Password Entries:", type="password")
+            li_email = st.text_input("Email Address:")
+            li_password = st.text_input("Password:", type="password")
             submit_login = st.form_submit_button("Access Profile Console", use_container_width=True)
             
             if submit_login:
@@ -180,7 +222,6 @@ if st.session_state["user_uid"] is None:
                 if "localId" in res:
                     st.session_state["user_uid"] = res["localId"]
                     st.session_state["user_email"] = res["email"]
-                    # Automatically pull down their cloud file on entry
                     cloud_load = load_schedule_from_firebase(res["localId"])
                     if cloud_load:
                         st.session_state["ai_data"] = cloud_load
@@ -205,14 +246,13 @@ if st.session_state["user_uid"] is None:
                         st.success("Registration success! Cloud profile allocated. You can now login above.")
                     else:
                         st.error(f"Registration Failed: {res.get('error', {}).get('message', 'Email profile conflict.')}")
-    st.stop()  # Halt execution so non-logged users cannot inspect components
+    st.stop()
 
 # ==========================================
 # RUNTIME ENVIRONMENT: DASHBOARD LAYOUT
 # ==========================================
 st.markdown('<p class="main-title">Study Sync Dashboard</p>', unsafe_allow_html=True)
 
-# Top Bar Profile Card & Sign-Out Mechanism
 profile_col1, profile_col2 = st.columns([5, 1])
 profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}** | System Protocol: Secure Token Handshake")
 if profile_col2.button("🚪 Log Out", use_container_width=True):
@@ -266,13 +306,15 @@ with right_panel:
             full_text = "".join([page.get_text() for page in doc])
                 
             filtered_lines = []
-            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "semester", "course"]
+            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "semester", "course", "subject"]
             for line in full_text.split("\n"):
                 clean_line = line.strip()
                 if any(kw in clean_line.lower() for kw in academic_keywords) or (len(clean_line) > 12 and any(char.isdigit() for char in clean_line)):
                     filtered_lines.append(clean_line)
             
-            condensed_syllabus = "\n".join(filtered_lines)[:14000] # Safe 14,000 character block window pass
+            condensed_syllabus = "\n".join(filtered_lines)
+            if len(condensed_syllabus) > 14000:
+                condensed_syllabus = condensed_syllabus[:14000]
             
             status_message.markdown('🚀 Dispatching datasets directly to Core hardware arrays...')
             progress_bar.progress(50)
@@ -299,7 +341,6 @@ with right_panel:
             
             st.session_state["ai_data"] = {"tasks": mapped_tasks, "study_plan": mapped_plan}
             
-            # Auto-save immediately to their secure folder location inside Firebase cloud
             save_schedule_to_firebase(st.session_state["user_uid"], mapped_tasks, mapped_plan)
             
             progress_bar.progress(100)
@@ -343,7 +384,6 @@ with right_panel:
             
             if not edited_roadmap.equals(roadmap_df):
                 st.session_state["ai_data"]["study_plan"] = edited_roadmap.to_dict(orient="records")
-                # Automatically save interactive state checkboxes back to their private document field
                 save_schedule_to_firebase(st.session_state["user_uid"], st.session_state["ai_data"]["tasks"], st.session_state["ai_data"]["study_plan"])
                 st.rerun()
             
