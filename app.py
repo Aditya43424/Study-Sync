@@ -214,7 +214,6 @@ if st.session_state["user_uid"] is None:
     
     with auth_tab1:
         with st.form("login_form"):
-            # ✨ ADDED UPFRONT PROFILE NAME TARGETING FOR RETURNING USERS
             li_username = st.text_input("Username / Roll Number:", value="Aditya").strip()
             li_email = st.text_input("Email Address:")
             li_password = st.text_input("Password:", type="password")
@@ -230,7 +229,6 @@ if st.session_state["user_uid"] is None:
                         st.session_state["user_email"] = res["email"]
                         st.session_state["username_val"] = li_username
                         
-                        # Automatically load their unique profile database file matching this identifier
                         cloud_load = load_schedule_from_firebase(li_username)
                         if cloud_load:
                             st.session_state["ai_data"] = cloud_load
@@ -242,7 +240,6 @@ if st.session_state["user_uid"] is None:
                     
     with auth_tab2:
         with st.form("signup_form"):
-            # ✨ ADDED UPFRONT RECORD SEEDING FOR NEW USER REGISTRATION
             su_username = st.text_input("Choose Unique Username / Roll Number:").strip()
             su_email = st.text_input("Email Address Registration Target:")
             su_password = st.text_input("Configure Strong Password:", type="password", help="Must be minimum 6 characters long")
@@ -254,14 +251,12 @@ if st.session_state["user_uid"] is None:
                 elif len(su_password) < 6:
                     st.error("Security Restriction: Passwords must contain at least 6 characters.")
                 else:
-                    # Security Pre-Check: Prevent new accounts from stealing existing profile namespaces
                     existing_profile = load_schedule_from_firebase(su_username)
                     if existing_profile:
                         st.error("⚠️ This profile name already exists in Firebase! Please choose a unique layout.")
                     else:
                         res = firebase_auth_request("signUp", su_email, su_password)
                         if "localId" in res:
-                            # Safely set up their blank cloud folder cell instantly under their profile name
                             save_schedule_to_firebase(su_username, [], [])
                             st.success("Registration success! Cloud profile allocated. You can now login using the Login tab.")
                         else:
@@ -271,7 +266,8 @@ if st.session_state["user_uid"] is None:
 # ==========================================
 # RUNTIME ENVIRONMENT: DASHBOARD LAYOUT
 # ==========================================
-st.markdown('<p class="main-title">Study Sync Dashboard</p>', unsafe_allow_html=True)
+# ✨ UPDATED HEADER: "Dashboard" removed as requested
+st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
 
 profile_col1, profile_col2 = st.columns([5, 1])
 profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}**")
@@ -286,7 +282,6 @@ st.markdown("---")
 left_panel, right_panel = st.columns([1, 2], gap="large")
 
 with left_panel:
-    # ✨ Dashboard clean up: Show their established name instead of an editable input field
     st.subheader("👤 Active Profile")
     st.info(f"Logged in as: **{st.session_state['username_val']}**")
 
