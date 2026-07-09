@@ -37,15 +37,12 @@ db = init_firebase()
 def register_cloud_user(email, password, username):
     """Creates a password-protected user profile inside Google Firebase Auth core."""
     try:
-        # Check if the username is already taken inside your Firestore records first
         user_doc = db.collection("users").document(username).get()
         if user_doc.exists:
             return False, "Username is already taken! Choose a unique handle."
             
-        # Create user inside Firebase Auth core engine
         user = auth.create_user(email=email, password=password, display_name=username)
         
-        # Provision an empty structural dashboard slot inside your Firestore tables automatically
         db.collection("users").document(username).set({
             "tasks": [],
             "study_plan": [],
@@ -66,7 +63,6 @@ def verify_cloud_login(email, password):
         
         if response.status_code == 200:
             data = response.json()
-            # Fetch the display username attached to this credential card profile
             user_record = auth.get_user(data["localId"])
             return True, user_record.display_name
         else:
@@ -78,15 +74,15 @@ def verify_cloud_login(email, password):
 # --- FIRESTORE DATA PERSISTENCE UTILITIES ---
 def save_schedule_to_firebase(username, tasks_list, plan_list):
     try:
-        clean_tasks = [{"task_name": t.get("n", t.get("task_name", "Unknown")), "due_date": t.get("d", t.get("due_date", ""))} for t in tasks_list]
+        clean_tasks = [{"task_name": t.get("task_name", "Unknown"), "due_date": t.get("due_date", "")} for t in tasks_list]
         clean_plan = [
             {
                 "Status": True if item.get("Status") == True else False,
-                "Scheduled Date": item.get("d", item.get("Scheduled Date", "")),
-                "Time Slot": item.get("t", item.get("Time Slot", "")),
-                "Focus Topic": item.get("f", item.get("Focus Topic", "")),
-                "Suggested Action": item.get("a", item.get("Suggested Action", "")),
-                "Hours Allocated": item.get("h", item.get("Hours Allocated", 2))
+                "Scheduled Date": item.get("Scheduled Date", ""),
+                "Time Slot": item.get("Time Slot", ""),
+                "Focus Topic": item.get("Focus Topic", ""),
+                "Suggested Action": item.get("Suggested Action", ""),
+                "Hours Allocated": item.get("Hours Allocated", 2)
             } for item in plan_list
         ]
         db.collection("users").document(username).update({
@@ -189,7 +185,6 @@ if not st.session_state["user_authenticated"]:
                     if success:
                         st.session_state["user_authenticated"] = True
                         st.session_state["active_username"] = username
-                        # Pre-fetch their cloud data array immediately upon validation pass
                         cloud_data = load_schedule_from_firebase(username)
                         if cloud_data:
                             st.session_state["ai_data"] = cloud_data
@@ -217,7 +212,7 @@ if not st.session_state["user_authenticated"]:
                             st.error(f"Registration Refused: {message}")
                 else:
                     st.warning("All configuration parameter tracking cells are required.")
-    st.stop()  # STOPS SCRIPT COMPILATION CRITICAL LAYER: WILL NOT RENDER CORE APP UNTIL LOGGED IN
+    st.stop()
 
 # --- STAGE 2: SYSTEM INTERFACE APPLICATION WINDOW ---
 user_id = st.session_state["active_username"]
@@ -310,17 +305,41 @@ with right_panel:
             
             status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating structural shorthand keys back to clear visual datagrides...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
-            mapped_tasks = [{"task_name": item.get("n", "Course Milestone"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
-            mapped_plan = [
-                {
-                    "Status": False,
-                    "Scheduled Date": item.get("d", "2026-06-15"),
-                    "Time Slot": item.get("t", f"{string_from} - {string_until}"),  
-                    "Focus Topic": item.get("f", "Topic Review Module"),
-                    "Suggested Action": item.get("a", "Review notes and practice core assignments"),
-                    "Hours Allocated": item.get("h", int(study_hours))
-                } for item in raw_ai_output.get("study_plan", [])
-            ]
+            
+            # --- ✨ CRITICAL FIX: HIGH-SECURITY TYPE-CHECKING ENGINE ---
+            raw_tasks = raw_ai_output.get("tasks", []) if isinstance(raw_ai_output, dict) else []
+            if not isinstance(raw_tasks, list):
+                raw_tasks = []
+                
+            mapped_tasks = []
+            for item in raw_tasks:
+                if isinstance(item, dict):
+                    mapped_tasks.append({
+                        "task_name": item.get("n", "Course Milestone"),
+                        "due_date": item.get("d", "2026-06-15")
+                    })
+                elif isinstance(item, str):
+                    mapped_tasks.append({
+                        "task_name": item,
+                        "due_date": "2026-06-15"
+                    })
+                    
+            raw_plan = raw_ai_output.get("study_plan", []) if isinstance(raw_ai_output, dict) else []
+            if not isinstance(raw_plan, list):
+                raw_plan = []
+                
+            mapped_plan = []
+            for item in raw_plan:
+                if isinstance(item, dict):
+                    mapped_plan.append({
+                        "Status": False,
+                        "Scheduled Date": item.get("d", "2026-06-15"),
+                        "Time Slot": item.get("t", f"{string_from} - {string_until}"),  
+                        "Focus Topic": item.get("f", "Topic Review Module"),
+                        "Suggested Action": item.get("a", "Review notes and practice core assignments"),
+                        "Hours Allocated": item.get("h", int(study_hours))
+                    })
+            # -----------------------------------------------------------
             
             st.session_state["ai_data"] = {"tasks": mapped_tasks, "study_plan": mapped_plan}
             save_schedule_to_firebase(user_id, mapped_tasks, mapped_plan)
