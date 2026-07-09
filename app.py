@@ -201,7 +201,7 @@ st.markdown("---")
 left_panel, right_panel = st.columns([1, 2], gap="large")
 
 with left_panel:
-    st.subheader("👤 Student Profile")
+    st.subheader("Student Profile")
     if "username_val" not in st.session_state:
         st.session_state["username_val"] = "Aditya"
         
