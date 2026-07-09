@@ -204,10 +204,10 @@ st.html("""
         font-weight: 800; 
         background: linear-gradient(
             90deg, 
-            #5227FF 0%, 
-            #FF9FFC 35%, 
-            #B497CF 70%, 
-            #5227FF 100%
+            #FF007F 0%,
+            #7928CA 35%,  
+            #00F2FE 70%,  
+            #FF007F 100%
         );
         background-size: 200% auto;
         -webkit-background-clip: text;
