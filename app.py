@@ -198,7 +198,31 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
 # GRAPHICS THEME SYSTEM (CSS)
 st.html("""
 <style>
-    .main-title { font-size: 3.6rem !important; font-weight: 800; background: linear-gradient(90deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 25px; }
+    /* ✨ NEW HIGH-SMOOTHNESS REACT BITS TEXT GRADIENT ENGINE */
+    .main-title { 
+        font-size: 3.8rem !important; 
+        font-weight: 800; 
+        background: linear-gradient(
+            90deg, 
+            #5227FF 0%, 
+            #FF9FFC 35%, 
+            #B497CF 70%, 
+            #5227FF 100%
+        );
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: textGradientShift 7s linear infinite;
+        margin-bottom: 25px;
+        display: inline-block;
+    }
+
+    @keyframes textGradientShift {
+        0% { background-position: 0% center; }
+        100% { background-position: 200% center; }
+    }
+
     div.stButton > button:first-child { background: linear-gradient(90deg, #00C6FF, #0072FF) !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: 600 !important; }
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
@@ -208,7 +232,6 @@ st.html("""
 # GATEWAY PHASE: CORE AUTHENTICATION UI
 # ==========================================
 if st.session_state["user_uid"] is None:
-    # ✨ FIXED: Removed the icon before "Study Sync" on the gateway login screen
     st.markdown('<center><p class="main-title">Study Sync</p></center>', unsafe_allow_html=True)
     
     auth_tab1, auth_tab2 = st.tabs(["🔒 Secure Login", "📝 Create Account"])
