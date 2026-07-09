@@ -208,7 +208,8 @@ st.html("""
 # GATEWAY PHASE: CORE AUTHENTICATION UI
 # ==========================================
 if st.session_state["user_uid"] is None:
-    st.markdown('<center><p class="main-title">📅 Study Sync</p></center>', unsafe_allow_html=True)
+    # ✨ FIXED: Removed the icon before "Study Sync" on the gateway login screen
+    st.markdown('<center><p class="main-title">Study Sync</p></center>', unsafe_allow_html=True)
     
     auth_tab1, auth_tab2 = st.tabs(["🔒 Secure Login", "📝 Create Account"])
     
@@ -266,7 +267,6 @@ if st.session_state["user_uid"] is None:
 # ==========================================
 # RUNTIME ENVIRONMENT: DASHBOARD LAYOUT
 # ==========================================
-# ✨ UPDATED HEADER: "Dashboard" removed as requested
 st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
 
 profile_col1, profile_col2 = st.columns([5, 1])
