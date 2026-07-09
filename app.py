@@ -18,6 +18,8 @@ if "user_uid" not in st.session_state:
     st.session_state["user_uid"] = None
 if "user_email" not in st.session_state:
     st.session_state["user_email"] = None
+if "username_val" not in st.session_state:
+    st.session_state["username_val"] = "Aditya"
 if "ai_data" not in st.session_state:
     st.session_state["ai_data"] = None
 if "page_count" not in st.session_state:
@@ -212,36 +214,58 @@ if st.session_state["user_uid"] is None:
     
     with auth_tab1:
         with st.form("login_form"):
+            # ✨ ADDED UPFRONT PROFILE NAME TARGETING FOR RETURNING USERS
+            li_username = st.text_input("Username / Roll Number:", value="Aditya").strip()
             li_email = st.text_input("Email Address:")
             li_password = st.text_input("Password:", type="password")
             submit_login = st.form_submit_button("Access Profile Console", use_container_width=True)
             
             if submit_login:
-                res = firebase_auth_request("signInWithPassword", li_email, li_password)
-                if "localId" in res:
-                    st.session_state["user_uid"] = res["localId"]
-                    st.session_state["user_email"] = res["email"]
-                    st.success("Verification confirmed! Redirecting...")
-                    time.sleep(0.5)
-                    st.rerun()
+                if not li_username:
+                    st.error("Please provide your profile Username / Roll Number.")
                 else:
-                    st.error(f"Authentication Failed: {res.get('error', {}).get('message', 'Unknown Verification Route Error')}")
+                    res = firebase_auth_request("signInWithPassword", li_email, li_password)
+                    if "localId" in res:
+                        st.session_state["user_uid"] = res["localId"]
+                        st.session_state["user_email"] = res["email"]
+                        st.session_state["username_val"] = li_username
+                        
+                        # Automatically load their unique profile database file matching this identifier
+                        cloud_load = load_schedule_from_firebase(li_username)
+                        if cloud_load:
+                            st.session_state["ai_data"] = cloud_load
+                        st.success("Verification confirmed! Redirecting...")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error(f"Authentication Failed: {res.get('error', {}).get('message', 'Unknown Verification Route Error')}")
                     
     with auth_tab2:
         with st.form("signup_form"):
+            # ✨ ADDED UPFRONT RECORD SEEDING FOR NEW USER REGISTRATION
+            su_username = st.text_input("Choose Unique Username / Roll Number:").strip()
             su_email = st.text_input("Email Address Registration Target:")
             su_password = st.text_input("Configure Strong Password:", type="password", help="Must be minimum 6 characters long")
             submit_signup = st.form_submit_button("Register Cloud Profile Key", use_container_width=True)
             
             if submit_signup:
-                if len(su_password) < 6:
+                if not su_username:
+                    st.error("Please specify a custom Username or Roll Number slot.")
+                elif len(su_password) < 6:
                     st.error("Security Restriction: Passwords must contain at least 6 characters.")
                 else:
-                    res = firebase_auth_request("signUp", su_email, su_password)
-                    if "localId" in res:
-                        st.success("Registration success! Cloud profile allocated. You can now login above.")
+                    # Security Pre-Check: Prevent new accounts from stealing existing profile namespaces
+                    existing_profile = load_schedule_from_firebase(su_username)
+                    if existing_profile:
+                        st.error("⚠️ This profile name already exists in Firebase! Please choose a unique layout.")
                     else:
-                        st.error(f"Registration Failed: {res.get('error', {}).get('message', 'Email profile conflict.')}")
+                        res = firebase_auth_request("signUp", su_email, su_password)
+                        if "localId" in res:
+                            # Safely set up their blank cloud folder cell instantly under their profile name
+                            save_schedule_to_firebase(su_username, [], [])
+                            st.success("Registration success! Cloud profile allocated. You can now login using the Login tab.")
+                        else:
+                            st.error(f"Registration Failed: {res.get('error', {}).get('message', 'Email profile conflict.')}")
     st.stop()
 
 # ==========================================
@@ -262,22 +286,9 @@ st.markdown("---")
 left_panel, right_panel = st.columns([1, 2], gap="large")
 
 with left_panel:
-    # ✨ RESTORED: Student Username Profile Section (Just like it was before!)
-    st.subheader("👤 Student Profile")
-    if "username_val" not in st.session_state:
-        st.session_state["username_val"] = "Aditya"
-        
-    user_id = st.text_input("Enter Username / Roll Number:", value=st.session_state["username_val"]).strip()
-    st.session_state["username_val"] = user_id 
-
-    if st.button("📂 Load From Cloud Database", use_container_width=True):
-        cloud_data = load_schedule_from_firebase(user_id)
-        if cloud_data:
-            st.session_state["ai_data"] = cloud_data
-            st.success(f"Loaded records securely for user: **{user_id}**")
-            st.rerun()
-        else:
-            st.warning("No saved profile records found in Firestore for this user.")
+    # ✨ Dashboard clean up: Show their established name instead of an editable input field
+    st.subheader("👤 Active Profile")
+    st.info(f"Logged in as: **{st.session_state['username_val']}**")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("⚙️ Schedule Parameters")
@@ -355,8 +366,7 @@ with right_panel:
             
             st.session_state["ai_data"] = {"tasks": mapped_tasks, "study_plan": mapped_plan}
             
-            # Saves keyed by the selected Username Profile
-            save_schedule_to_firebase(user_id, mapped_tasks, mapped_plan)
+            save_schedule_to_firebase(st.session_state["username_val"], mapped_tasks, mapped_plan)
             
             progress_bar.progress(100)
             status_message.empty()
@@ -370,7 +380,7 @@ with right_panel:
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.container(border=True).metric(label="Total Pages Sparsed", value=f"{st.session_state['page_count']} Pages")
         m_col2.container(border=True).metric(label="Total Generated Milestones", value=f"{total_rows} Actions")
-        m_col3.container(border=True).metric(label="Active Username Profile", value=user_id)
+        m_col3.container(border=True).metric(label="Active Target Profile", value=st.session_state["username_val"])
         
         st.markdown("<br>", unsafe_allow_html=True)
         t_col1, t_col2 = st.columns([1, 2], gap="medium")
@@ -399,12 +409,12 @@ with right_panel:
             
             if not edited_roadmap.equals(roadmap_df):
                 st.session_state["ai_data"]["study_plan"] = edited_roadmap.to_dict(orient="records")
-                save_schedule_to_firebase(user_id, st.session_state["ai_data"]["tasks"], st.session_state["ai_data"]["study_plan"])
+                save_schedule_to_firebase(st.session_state["username_val"], st.session_state["ai_data"]["tasks"], st.session_state["ai_data"]["study_plan"])
                 st.rerun()
             
             st.markdown("<br>", unsafe_allow_html=True)
             d_col1, d_col2 = st.columns(2)
             with d_col1:
-                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{user_id}_schedule.ics", mime="text/calendar", use_container_width=True)
+                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{st.session_state['username_val']}_schedule.ics", mime="text/calendar", use_container_width=True)
             with d_col2:
-                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{user_id}_checklist.csv", mime="text/csv", use_container_width=True)
+                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{st.session_state['username_val']}_checklist.csv", mime="text/csv", use_container_width=True)
