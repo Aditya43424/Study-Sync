@@ -21,6 +21,8 @@ if "ai_data" not in st.session_state:
     st.session_state["ai_data"] = None
 if "page_count" not in st.session_state:
     st.session_state["page_count"] = 0
+if "raw_debug_json" not in st.session_state:
+    st.session_state["raw_debug_json"] = ""
 
 # --- GOOGLE FIREBASE CLOUD INITIALIZATION ---
 def init_firebase():
@@ -100,15 +102,15 @@ def load_schedule_from_firebase(username):
         doc = db.collection("users").document(username).get()
         if doc.exists:
             data = doc.to_dict()
-            tasks = [{"task_name": t["task_name"], "due_date": t["due_date"]} for t in data.get("tasks", [])]
+            tasks = [{"task_name": t.get("task_name", "Unknown"), "due_date": t.get("due_date", "")} for t in data.get("tasks", [])]
             study_plan = [
                 {
-                    "Status": item["Status"],
-                    "Scheduled Date": item["Scheduled Date"],
-                    "Time Slot": item["Time Slot"],
-                    "Focus Topic": item["Focus Topic"],
-                    "Suggested Action": item["Suggested Action"],
-                    "Hours Allocated": item["Hours Allocated"]
+                    "Status": item.get("Status", False),
+                    "Scheduled Date": item.get("Scheduled Date", ""),
+                    "Time Slot": item.get("Time Slot", ""),
+                    "Focus Topic": item.get("Focus Topic", ""),
+                    "Suggested Action": item.get("Suggested Action", ""),
+                    "Hours Allocated": item.get("Hours Allocated", 2)
                 } for item in data.get("study_plan", [])
             ]
             return {"tasks": tasks, "study_plan": study_plan}
@@ -142,17 +144,36 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
         try:
             client = Groq(api_key=st.secrets["GROQ_API_KEY"])
             weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
+            
             prompt = f"""
             Analyze the filtered syllabus text and output a valid JSON string object containing exactly two array fields: 'tasks' and 'study_plan'.
+            
+            The JSON object structure must follow this explicit pattern exactly:
+            {{
+                "tasks": [
+                    {{"task_name": "Assignment Name", "due_date": "YYYY-MM-DD"}}
+                ],
+                "study_plan": [
+                    {{
+                        "scheduled_date": "YYYY-MM-DD",
+                        "time_slot": "Window String",
+                        "focus_topic": "Concrete Technical Concept",
+                        "suggested_action": "Action Item",
+                        "hours_allocated": 2
+                    }}
+                ]
+            }}
+
             CRITICAL LINEAR SEQUENCE RULE: Read systematically from TOP TO BOTTOM. Map topics row-by-row in the exact chronological order they appear in the document text.
             STRICT FILLER BAN RULE: NEVER write vague placeholder labels like 'Review of all topics' or 'Introduction to new topics' repeatedly. Each row must extract a concrete technical concept item name. Generate between 80 to 120 rows to capture complete course depth.
             Constraints: Study windows strictly {start_hr} to {end_hr}. current date is June 2026. Capacity: {hours} hours/day at a '{intensity}' pace. {weekend_rule}
             Syllabus Text:\n{condensed_text}
             """
+            
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler outputting raw JSON arrays with compressed single-character keys matching the standard model design perfectly. Maximize row generation item parameters up to 120 unique cells."},
+                    {"role": "system", "content": "You are a linear database compiler script. You must output a valid JSON object matching the requested schema fields exactly. Do not abbreviate or shorten the parent object keys under any circumstances. Ensure arrays are fully built out to maximum structural row count entries."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
@@ -166,7 +187,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 continue
             return {"error_mode_active": True, "details": error_msg}
 
-# --- SYSTEM AUTHENTICATION WALL CONTROLLER ---
+# --- STAGE 1: SYSTEM AUTHENTICATION WALL CONTROLLER ---
 if not st.session_state["user_authenticated"]:
     st.html("<style>.main-title { font-size: 3.6rem !important; font-weight: 800; background: linear-gradient(90deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-top: 5vh; }</style>")
     st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
@@ -214,7 +235,7 @@ if not st.session_state["user_authenticated"]:
                     st.warning("All configuration parameter tracking cells are required.")
     st.stop()
 
-# --- SYSTEM INTERFACE APPLICATION WINDOW ---
+# --- STAGE 2: SYSTEM INTERFACE APPLICATION WINDOW ---
 user_id = st.session_state["active_username"]
 
 st.html("""<style>
@@ -299,6 +320,8 @@ with right_panel:
             progress_bar.progress(50)
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
             
+            st.session_state["raw_debug_json"] = json.dumps(raw_ai_output, indent=2)
+            
             if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
                 progress_bar.empty(); status_message.empty()
                 st.error("❌ **Groq Core API Error:**"); st.code(raw_ai_output["details"], language="text"); st.stop()
@@ -306,11 +329,10 @@ with right_panel:
             status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating structural shorthand keys back to clear visual datagrides...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             
-            # --- ✨ UPGRADED POLYMORPHIC KEY RESOLUTION ENGINE ---
+            # --- ✨ HIGH-SECURITY TYPE-CHECKING ENGINE ---
             if not isinstance(raw_ai_output, dict):
                 raw_ai_output = {}
                 
-            # Dynamic matching loop for the tasks array key variation
             raw_tasks = []
             for k in ["tasks", "tasks_list", "t", "task", "tasksList"]:
                 if k in raw_ai_output and isinstance(raw_ai_output[k], list):
@@ -320,14 +342,12 @@ with right_panel:
             mapped_tasks = []
             for item in raw_tasks:
                 if isinstance(item, dict):
-                    # Search inside for 'n' or 'task_name' or alternative variants
-                    t_name = item.get("n", item.get("task_name", item.get("task", "Course Milestone")))
-                    t_date = item.get("d", item.get("due_date", item.get("date", "2026-06-15")))
+                    t_name = item.get("task_name", item.get("n", item.get("task", "Course Milestone")))
+                    t_date = item.get("due_date", item.get("d", item.get("date", "2026-06-15")))
                     mapped_tasks.append({"task_name": t_name, "due_date": t_date})
                 elif isinstance(item, str):
                     mapped_tasks.append({"task_name": item, "due_date": "2026-06-15"})
                     
-            # Dynamic matching loop for the study_plan array key variation
             raw_plan = []
             for k in ["study_plan", "studyPlan", "plan", "s", "p", "study_roadmap"]:
                 if k in raw_ai_output and isinstance(raw_ai_output[k], list):
@@ -337,12 +357,11 @@ with right_panel:
             mapped_plan = []
             for item in raw_plan:
                 if isinstance(item, dict):
-                    # Robust inner cell property checks mapping shorthand characters safely back to UI strings
-                    d_val = item.get("d", item.get("date", item.get("Scheduled Date", "2026-06-15")))
-                    t_val = item.get("t", item.get("time", item.get("Time Slot", f"{string_from} - {string_until}")))
-                    f_val = item.get("f", item.get("focus", item.get("Focus Topic", "Topic Review Module")))
-                    a_val = item.get("a", item.get("action", item.get("Suggested Action", "Review notes and study module assignments")))
-                    h_val = item.get("h", item.get("hours", item.get("Hours Allocated", int(study_hours))))
+                    d_val = item.get("scheduled_date", item.get("d", item.get("date", item.get("Scheduled Date", "2026-06-15"))))
+                    t_val = item.get("time_slot", item.get("t", item.get("time", item.get("Time Slot", f"{string_from} - {string_until}"))))
+                    f_val = item.get("focus_topic", item.get("f", item.get("focus", item.get("Focus Topic", "Topic Review Module"))))
+                    a_val = item.get("suggested_action", item.get("a", item.get("action", item.get("Suggested Action", "Review notes"))))
+                    h_val = item.get("hours_allocated", item.get("h", item.get("hours", item.get("Hours Allocated", int(study_hours)))))
                     
                     mapped_plan.append({
                         "Status": False,
@@ -358,7 +377,10 @@ with right_panel:
             save_schedule_to_firebase(user_id, mapped_tasks, mapped_plan)
             
             status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Synchronizing interactive checklist frameworks...</p>', unsafe_allow_html=True)
-            progress_bar.progress(100); time.sleep(0.3); progress_bar.empty(); status_message.empty()
+            progress_bar.progress(100)
+            time.sleep(0.3)
+            progress_bar.empty()
+            status_message.empty()
 
     if st.session_state["ai_data"] is not None:
         st.html(f"""<div style="display: flex; align-items: center; background: rgba(0, 198, 255, 0.04); border: 1px solid rgba(0, 198, 255, 0.25); border-radius: 12px; padding: 20px 24px; margin-bottom: 32px;">
@@ -377,6 +399,10 @@ with right_panel:
         with m_col1: st.container(border=True).metric(label="Pages Read", value=f"{st.session_state['page_count']} Pages")
         with m_col2: st.container(border=True).metric(label="AI Daily Milestones", value=f"{total_rows} Actions")
         with m_col3: st.container(border=True).metric(label="Active Account Holder", value=user_id)
+        
+        if total_rows == 0 and st.session_state["raw_debug_json"]:
+            with st.expander("🔍 AI Output Diagnostic Trace (Click to Open)"):
+                st.code(st.session_state["raw_debug_json"], language="json")
         
         st.markdown("<br>", unsafe_allow_html=True)
         t_col1, t_col2 = st.columns([1, 2], gap="medium")
