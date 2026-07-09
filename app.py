@@ -45,8 +45,8 @@ def firebase_auth_request(endpoint, email, password):
     return response.json()
 
 # --- FIREBASE FIRESTORE DATA COUPLERS ---
-def save_schedule_to_firebase(uid, tasks_list, plan_list):
-    """Commits user milestones directly to their unique private Firestore document cell."""
+def save_schedule_to_firebase(profile_name, tasks_list, plan_list):
+    """Commits user milestones directly to the specified username profile cell."""
     try:
         clean_tasks = [{"task_name": t.get("n", t.get("task_name", "Unknown")), "due_date": t.get("d", t.get("due_date", ""))} for t in tasks_list]
         clean_plan = [
@@ -60,7 +60,7 @@ def save_schedule_to_firebase(uid, tasks_list, plan_list):
             } for item in plan_list
         ]
         
-        user_doc_ref = db.collection("users").document(uid)
+        user_doc_ref = db.collection("users").document(profile_name)
         user_doc_ref.set({
             "tasks": clean_tasks,
             "study_plan": clean_plan,
@@ -71,10 +71,10 @@ def save_schedule_to_firebase(uid, tasks_list, plan_list):
         st.error(f"Cloud Storage Warning: {e}")
         return False
 
-def load_schedule_from_firebase(uid):
-    """Pulls persistent user records out of private Firestore document paths."""
+def load_schedule_from_firebase(profile_name):
+    """Pulls persistent user records out of specific Firestore username profile paths."""
     try:
-        user_doc_ref = db.collection("users").document(uid)
+        user_doc_ref = db.collection("users").document(profile_name)
         doc = user_doc_ref.get()
         if doc.exists:
             data = doc.to_dict()
@@ -144,28 +144,29 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
             
             prompt = f"""
-            You are an elite academic strategy coach. Analyze the provided syllabus text layout and output a valid JSON string object.
+            You are an elite academic strategy coach. Analyze the filtered syllabus data text and output a valid JSON string object.
             The JSON object must contain exactly two array fields:
             1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
             2. "study_plan": an array of objects containing:
                - "d": scheduled date (YYYY-MM-DD)
                - "t": time slot window string
-               - "f": focus topic (precise conceptual chapter sub-topic name or laboratory experiment title extracted directly from the text payload)
+               - "f": focus topic (precise conceptual chapter or lesson name extracted from the text layout)
                - "a": suggested actionable study item
                - "h": hours allocated (integer)
             
             CRITICAL LINEAR SEQUENCE RULE:
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
-            - Generate your study plan row-by-row in the exact chronological order that the units, chapters, labs, and semesters appear in the text document.
+            - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
+            - When you encounter 'Semester 2' or 'Second Semester' milestones, look directly at the lines following it and extract the real technical lesson topics.
             
-            STRICT CONTENT BOUNDARY RULE (NO FILLER):
-            - ONLY generate rows for concrete, specific topics or laboratory experiments that are explicitly named in the text payload.
-            - DO NOT create a daily row for every consecutive calendar date if you run out of unique topics. If there are only 5 experiments or topics listed in the syllabus section, your "study_plan" array must contain exactly 5 entries.
-            - ABSOLUTELY FORBIDDEN: Do not repeat topics or generate lazy placeholder entries such as 'Review and Practice', 'Review all concepts and practice', 'Introduction to new topics', or 'Final preparation for exams'. Stop generating items entirely when you reach the end of the text's real subjects.
+            STRICT FILLER BAN RULE:
+            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', 'Practice problems on new topics', or 'Final preparation for exams' repeatedly.
+            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic or practical concept found in the text.
+            - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
             
             USER AVAILABILITY CONSTRAINTS:
             - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
-            - Assume the current date is June 2026. Space rows out sequentially across separate active study days.
+            - Assume the current date is June 2026. Space rows out sequentially across separate months.
             - Capacity: {hours} hours per day at a '{intensity}' pace.
             - {weekend_rule}
             - All dates must use 'YYYY-MM-DD' format.
@@ -177,11 +178,11 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a precise syllabus translator. Convert raw text into a data timeline. Generate rows ONLY for explicit topics, lessons, or experiments written in the text. Stop generating instantly when you run out of explicit material. Never pad the array with placeholder review blocks or repeat phrases."},
+                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=4000  
+                max_tokens=6000  
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
@@ -220,9 +221,6 @@ if st.session_state["user_uid"] is None:
                 if "localId" in res:
                     st.session_state["user_uid"] = res["localId"]
                     st.session_state["user_email"] = res["email"]
-                    cloud_load = load_schedule_from_firebase(res["localId"])
-                    if cloud_load:
-                        st.session_state["ai_data"] = cloud_load
                     st.success("Verification confirmed! Redirecting...")
                     time.sleep(0.5)
                     st.rerun()
@@ -252,7 +250,7 @@ if st.session_state["user_uid"] is None:
 st.markdown('<p class="main-title">Study Sync Dashboard</p>', unsafe_allow_html=True)
 
 profile_col1, profile_col2 = st.columns([5, 1])
-profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}** | System Protocol: Secure Token Handshake")
+profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}**")
 if profile_col2.button("🚪 Log Out", use_container_width=True):
     st.session_state["user_uid"] = None
     st.session_state["user_email"] = None
@@ -264,6 +262,24 @@ st.markdown("---")
 left_panel, right_panel = st.columns([1, 2], gap="large")
 
 with left_panel:
+    # ✨ RESTORED: Student Username Profile Section (Just like it was before!)
+    st.subheader("👤 Student Profile")
+    if "username_val" not in st.session_state:
+        st.session_state["username_val"] = "Aditya"
+        
+    user_id = st.text_input("Enter Username / Roll Number:", value=st.session_state["username_val"]).strip()
+    st.session_state["username_val"] = user_id 
+
+    if st.button("📂 Load From Cloud Database", use_container_width=True):
+        cloud_data = load_schedule_from_firebase(user_id)
+        if cloud_data:
+            st.session_state["ai_data"] = cloud_data
+            st.success(f"Loaded records securely for user: **{user_id}**")
+            st.rerun()
+        else:
+            st.warning("No saved profile records found in Firestore for this user.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("⚙️ Schedule Parameters")
     with st.container(border=True):
         study_hours = st.slider("Daily Study Capacity (Hours)", 1, 8, 3)
@@ -302,11 +318,17 @@ with right_panel:
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
             full_text = "".join([page.get_text() for page in doc])
+                
+            filtered_lines = []
+            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "semester", "course", "subject"]
+            for line in full_text.split("\n"):
+                clean_line = line.strip()
+                if any(kw in clean_line.lower() for kw in academic_keywords) or (len(clean_line) > 12 and any(char.isdigit() for char in clean_line)):
+                    filtered_lines.append(clean_line)
             
-            # Use raw high-fidelity context window
-            condensed_syllabus = full_text
-            if len(condensed_syllabus) > 15000:
-                condensed_syllabus = condensed_syllabus[:15000]
+            condensed_syllabus = "\n".join(filtered_lines)
+            if len(condensed_syllabus) > 14000:
+                condensed_syllabus = condensed_syllabus[:14000]
             
             status_message.markdown('🚀 Dispatching datasets directly to Core hardware arrays...')
             progress_bar.progress(50)
@@ -333,7 +355,8 @@ with right_panel:
             
             st.session_state["ai_data"] = {"tasks": mapped_tasks, "study_plan": mapped_plan}
             
-            save_schedule_to_firebase(st.session_state["user_uid"], mapped_tasks, mapped_plan)
+            # Saves keyed by the selected Username Profile
+            save_schedule_to_firebase(user_id, mapped_tasks, mapped_plan)
             
             progress_bar.progress(100)
             status_message.empty()
@@ -347,7 +370,7 @@ with right_panel:
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.container(border=True).metric(label="Total Pages Sparsed", value=f"{st.session_state['page_count']} Pages")
         m_col2.container(border=True).metric(label="Total Generated Milestones", value=f"{total_rows} Actions")
-        m_col3.container(border=True).metric(label="Selected Focus Speed", value=focus_level)
+        m_col3.container(border=True).metric(label="Active Username Profile", value=user_id)
         
         st.markdown("<br>", unsafe_allow_html=True)
         t_col1, t_col2 = st.columns([1, 2], gap="medium")
@@ -376,12 +399,12 @@ with right_panel:
             
             if not edited_roadmap.equals(roadmap_df):
                 st.session_state["ai_data"]["study_plan"] = edited_roadmap.to_dict(orient="records")
-                save_schedule_to_firebase(st.session_state["user_uid"], st.session_state["ai_data"]["tasks"], st.session_state["ai_data"]["study_plan"])
+                save_schedule_to_firebase(user_id, st.session_state["ai_data"]["tasks"], st.session_state["ai_data"]["study_plan"])
                 st.rerun()
             
             st.markdown("<br>", unsafe_allow_html=True)
             d_col1, d_col2 = st.columns(2)
             with d_col1:
-                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name="studysync_schedule.ics", mime="text/calendar", use_container_width=True)
+                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{user_id}_schedule.ics", mime="text/calendar", use_container_width=True)
             with d_col2:
-                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name="studysync_checklist.csv", mime="text/csv", use_container_width=True)
+                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{user_id}_checklist.csv", mime="text/csv", use_container_width=True)
