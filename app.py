@@ -151,29 +151,34 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             The JSON object structure must follow this explicit pattern exactly:
             {{
                 "tasks": [
-                    {{"task_name": "Assignment Name", "due_date": "YYYY-MM-DD"}}
+                    {{"task_name": "Assignment/Exam Name", "due_date": "YYYY-MM-DD"}}
                 ],
                 "study_plan": [
                     {{
                         "scheduled_date": "YYYY-MM-DD",
-                        "time_slot": "Window String",
+                        "time_slot": "{start_hr} - {end_hr}",
                         "focus_topic": "Concrete Technical Concept",
-                        "suggested_action": "Action Item",
-                        "hours_allocated": 2
+                        "suggested_action": "Specific Action Item",
+                        "hours_allocated": {hours}
                     }}
                 ]
             }}
 
-            CRITICAL LINEAR SEQUENCE RULE: Read systematically from TOP TO BOTTOM. Map topics row-by-row in the exact chronological order they appear in the document text.
-            STRICT FILLER BAN RULE: NEVER write vague placeholder labels like 'Review of all topics' or 'Introduction to new topics' repeatedly. Each row must extract a concrete technical concept item name. Generate between 80 to 120 rows to capture complete course depth.
-            Constraints: Study windows strictly {start_hr} to {end_hr}. current date is June 2026. Capacity: {hours} hours/day at a '{intensity}' pace. {weekend_rule}
+            CRITICAL DIRECTIONS:
+            - Read systematically from TOP TO BOTTOM. Map topics row-by-row in the exact chronological order they appear in the document text.
+            - Extract deep technical sub-topics (e.g., specific algorithms, code tools, mathematical concepts). NEVER use generic filler words like 'Review' or 'Intro to new topics' across multiple rows.
+            - Generate between 80 to 120 separate row entries in the 'study_plan' to completely capture the multi-semester course depth.
+            - Assume the current year is 2026. Space rows out sequentially across separate calendar dates.
+            - {weekend_rule}
+            
             Syllabus Text:\n{condensed_text}
             """
             
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear database compiler script. You must output a valid JSON object matching the requested schema fields exactly. Do not abbreviate or shorten the parent object keys under any circumstances. Ensure arrays are fully built out to maximum structural row count entries."},
+                    # ✨ FIXED: System prompt completely aligned with the user schema requirements
+                    {"role": "system", "content": "You are a structured data extraction engine. You must output a valid JSON object matching the requested schema keys ('tasks' and 'study_plan') exactly. Do not use abbreviated shorthand or single-character keys. Maximize row count up to 120 items to represent the full syllabus completely."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
@@ -329,7 +334,7 @@ with right_panel:
             status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating structural shorthand keys back to clear visual datagrides...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             
-            # --- ✨ HIGH-SECURITY TYPE-CHECKING ENGINE ---
+            # --- HIGH-SECURITY POLYMORPHIC PARSING ENGINE ---
             if not isinstance(raw_ai_output, dict):
                 raw_ai_output = {}
                 
