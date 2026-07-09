@@ -144,25 +144,24 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
             
             prompt = f"""
-            You are an elite academic strategy coach. Analyze the filtered syllabus data text and output a valid JSON string object.
+            You are an elite academic strategy coach. Analyze the provided syllabus text layout and output a valid JSON string object.
             The JSON object must contain exactly two array fields:
             1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
             2. "study_plan": an array of objects containing:
                - "d": scheduled date (YYYY-MM-DD)
                - "t": time slot window string
-               - "f": focus topic (precise conceptual chapter or lesson name extracted from the text layout)
+               - "f": focus topic (precise conceptual chapter sub-topic name extracted directly from the text payload)
                - "a": suggested actionable study item
                - "h": hours allocated (integer)
             
             CRITICAL LINEAR SEQUENCE RULE:
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
-            - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
-            - When you encounter 'Semester 2' or 'Second Semester' milestones, look directly at the lines following it and extract the real technical lesson topics.
+            - You MUST generate your study plan row-by-row in the exact chronological order that the units, chapters, labs, and semesters appear in the text document.
             
             STRICT FILLER BAN RULE:
-            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', 'Practice problems on new topics', or 'Final preparation for exams' repeatedly.
-            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic or practical concept found in the text.
-            - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
+            - NEVER use vague, lazy placeholder phrases like 'Review and Practice', 'Review all concepts and practice', 'Introduction to new topics', or 'Final preparation for exams'.
+            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic, programming concept, or experiment name found in the text (e.g., 'Socket Programming API', 'Client-Server Handshakes', 'Multithreading sync lines').
+            - Only generate entries for topics that are explicitly written in the text. If you run out of unique topics from the syllabus text, stop generating more rows. Quality and specificity are more important than padding row counts.
             
             USER AVAILABILITY CONSTRAINTS:
             - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
@@ -178,12 +177,11 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
+                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Extract explicit technical sub-topics from top to bottom. Never write placeholder review blocks."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                # CRITICAL BALANCE FIX: Reduced reservation to safely pass the 12k rate limit gate
-                max_tokens=6000  
+                max_tokens=5500  # Balanced output window reservation space
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
@@ -304,17 +302,12 @@ with right_panel:
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
             full_text = "".join([page.get_text() for page in doc])
-                
-            filtered_lines = []
-            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "semester", "course", "subject"]
-            for line in full_text.split("\n"):
-                clean_line = line.strip()
-                if any(kw in clean_line.lower() for kw in academic_keywords) or (len(clean_line) > 12 and any(char.isdigit() for char in clean_line)):
-                    filtered_lines.append(clean_line)
             
-            condensed_syllabus = "\n".join(filtered_lines)
-            if len(condensed_syllabus) > 14000:
-                condensed_syllabus = condensed_syllabus[:14000]
+            # ✨ FIXED HIGH-FIDELITY RAW TEXT EXTRACTION WINDOW
+            # We preserve everything intact so sub-topics and bullet points are never deleted
+            condensed_syllabus = full_text
+            if len(condensed_syllabus) > 15000:
+                condensed_syllabus = condensed_syllabus[:15000]
             
             status_message.markdown('🚀 Dispatching datasets directly to Core hardware arrays...')
             progress_bar.progress(50)
