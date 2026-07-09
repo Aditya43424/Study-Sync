@@ -166,7 +166,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 continue
             return {"error_mode_active": True, "details": error_msg}
 
-# --- STAGE 1: SYSTEM AUTHENTICATION WALL CONTROLLER ---
+# --- SYSTEM AUTHENTICATION WALL CONTROLLER ---
 if not st.session_state["user_authenticated"]:
     st.html("<style>.main-title { font-size: 3.6rem !important; font-weight: 800; background: linear-gradient(90deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-top: 5vh; }</style>")
     st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
@@ -214,7 +214,7 @@ if not st.session_state["user_authenticated"]:
                     st.warning("All configuration parameter tracking cells are required.")
     st.stop()
 
-# --- STAGE 2: SYSTEM INTERFACE APPLICATION WINDOW ---
+# --- SYSTEM INTERFACE APPLICATION WINDOW ---
 user_id = st.session_state["active_username"]
 
 st.html("""<style>
@@ -306,38 +306,51 @@ with right_panel:
             status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating structural shorthand keys back to clear visual datagrides...</p>', unsafe_allow_html=True)
             progress_bar.progress(75)
             
-            # --- ✨ CRITICAL FIX: HIGH-SECURITY TYPE-CHECKING ENGINE ---
-            raw_tasks = raw_ai_output.get("tasks", []) if isinstance(raw_ai_output, dict) else []
-            if not isinstance(raw_tasks, list):
-                raw_tasks = []
+            # --- ✨ UPGRADED POLYMORPHIC KEY RESOLUTION ENGINE ---
+            if not isinstance(raw_ai_output, dict):
+                raw_ai_output = {}
                 
+            # Dynamic matching loop for the tasks array key variation
+            raw_tasks = []
+            for k in ["tasks", "tasks_list", "t", "task", "tasksList"]:
+                if k in raw_ai_output and isinstance(raw_ai_output[k], list):
+                    raw_tasks = raw_ai_output[k]
+                    break
+                    
             mapped_tasks = []
             for item in raw_tasks:
                 if isinstance(item, dict):
-                    mapped_tasks.append({
-                        "task_name": item.get("n", "Course Milestone"),
-                        "due_date": item.get("d", "2026-06-15")
-                    })
+                    # Search inside for 'n' or 'task_name' or alternative variants
+                    t_name = item.get("n", item.get("task_name", item.get("task", "Course Milestone")))
+                    t_date = item.get("d", item.get("due_date", item.get("date", "2026-06-15")))
+                    mapped_tasks.append({"task_name": t_name, "due_date": t_date})
                 elif isinstance(item, str):
-                    mapped_tasks.append({
-                        "task_name": item,
-                        "due_date": "2026-06-15"
-                    })
+                    mapped_tasks.append({"task_name": item, "due_date": "2026-06-15"})
                     
-            raw_plan = raw_ai_output.get("study_plan", []) if isinstance(raw_ai_output, dict) else []
-            if not isinstance(raw_plan, list):
-                raw_plan = []
-                
+            # Dynamic matching loop for the study_plan array key variation
+            raw_plan = []
+            for k in ["study_plan", "studyPlan", "plan", "s", "p", "study_roadmap"]:
+                if k in raw_ai_output and isinstance(raw_ai_output[k], list):
+                    raw_plan = raw_ai_output[k]
+                    break
+                    
             mapped_plan = []
             for item in raw_plan:
                 if isinstance(item, dict):
+                    # Robust inner cell property checks mapping shorthand characters safely back to UI strings
+                    d_val = item.get("d", item.get("date", item.get("Scheduled Date", "2026-06-15")))
+                    t_val = item.get("t", item.get("time", item.get("Time Slot", f"{string_from} - {string_until}")))
+                    f_val = item.get("f", item.get("focus", item.get("Focus Topic", "Topic Review Module")))
+                    a_val = item.get("a", item.get("action", item.get("Suggested Action", "Review notes and study module assignments")))
+                    h_val = item.get("h", item.get("hours", item.get("Hours Allocated", int(study_hours))))
+                    
                     mapped_plan.append({
                         "Status": False,
-                        "Scheduled Date": item.get("d", "2026-06-15"),
-                        "Time Slot": item.get("t", f"{string_from} - {string_until}"),  
-                        "Focus Topic": item.get("f", "Topic Review Module"),
-                        "Suggested Action": item.get("a", "Review notes and practice core assignments"),
-                        "Hours Allocated": item.get("h", int(study_hours))
+                        "Scheduled Date": d_val,
+                        "Time Slot": t_val,
+                        "Focus Topic": f_val,
+                        "Suggested Action": a_val,
+                        "Hours Allocated": int(h_val)
                     })
             # -----------------------------------------------------------
             
