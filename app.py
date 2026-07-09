@@ -158,15 +158,14 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
             - Generate your study plan row-by-row in the exact chronological order that the units, chapters, labs, and semesters appear in the text document.
             
-            STRICT ZERO-PADDING LENGTH RULE:
-            - Your 'study_plan' array must have EXACTLY one entry per distinct sub-topic, specific programming concept, or laboratory experiment explicitly written in the syllabus text.
-            - DO NOT pad the calendar or expand the schedule with artificial days to reach an arbitrary count.
-            - ABSOLUTELY FORBIDDEN: Never generate generic placeholder filler rows like 'Review and Practice', 'Review all concepts and practice', 'Introduction to new topics', or 'Final preparation for exams'.
-            - If the text provided contains only 10 unique topic items, then your 'study_plan' array must contain exactly 10 items. Stop generating the moment you reach the end of the real syllabus topics.
+            STRICT CONTENT BOUNDARY RULE (NO FILLER):
+            - ONLY generate rows for concrete, specific topics or laboratory experiments that are explicitly named in the text payload.
+            - DO NOT create a daily row for every consecutive calendar date if you run out of unique topics. If there are only 5 experiments or topics listed in the syllabus section, your "study_plan" array must contain exactly 5 entries.
+            - ABSOLUTELY FORBIDDEN: Do not repeat topics or generate lazy placeholder entries such as 'Review and Practice', 'Review all concepts and practice', 'Introduction to new topics', or 'Final preparation for exams'. Stop generating items entirely when you reach the end of the text's real subjects.
             
             USER AVAILABILITY CONSTRAINTS:
             - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
-            - Assume the current date is June 2026. Space rows out sequentially across separate days.
+            - Assume the current date is June 2026. Space rows out sequentially across separate active study days.
             - Capacity: {hours} hours per day at a '{intensity}' pace.
             - {weekend_rule}
             - All dates must use 'YYYY-MM-DD' format.
@@ -178,11 +177,11 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Stop generating rows the absolute second you run out of unique technical concepts inside the input text. Never create padding entries."},
+                    {"role": "system", "content": "You are a precise syllabus translator. Convert raw text into a data timeline. Generate rows ONLY for explicit topics, lessons, or experiments written in the text. Stop generating instantly when you run out of explicit material. Never pad the array with placeholder review blocks or repeat phrases."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=5500  
+                max_tokens=4000  
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
@@ -304,7 +303,7 @@ with right_panel:
             st.session_state["page_count"] = doc.page_count
             full_text = "".join([page.get_text() for page in doc])
             
-            # Use a robust raw text block slice from the document context stream
+            # Use raw high-fidelity context window
             condensed_syllabus = full_text
             if len(condensed_syllabus) > 15000:
                 condensed_syllabus = condensed_syllabus[:15000]
