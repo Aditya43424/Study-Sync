@@ -181,7 +181,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
-                    {"role": "user", "content": prompt}  # ✨ FIXED: Resolved the dict SyntaxError typo here
+                    {"role": "user", "content": prompt}  # ✨ FIXED: Changed from "content prompt" to valid dictionary syntax
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -198,7 +198,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
 # GRAPHICS THEME SYSTEM (CSS & JS INJECTION)
 st.html("""
 <style>
-    /* Blue | Dark Blue | White Gradient Shifter */
+    /* Blue | Dark Blue | White Gradient Shifter Header */
     .main-title { 
         font-size: 3.8rem !important; 
         font-weight: 800; 
@@ -212,7 +212,7 @@ st.html("""
         display: inline-block;
     }
 
-    @webkit-keyframes textGradientShift {
+    @-webkit-keyframes textGradientShift {
         0% { background-position: 0% center; }
         100% { background-position: 200% center; }
     }
