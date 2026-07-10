@@ -159,11 +159,10 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             CRITICAL LINEAR SEQUENCE RULE:
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
             - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
-            - When you encounter 'Semester 2' or 'Second Semester' milestones, look directly at the lines following it and extract the real technical lesson topics.
             
-            STRICT FILLER BAN RULE:
-            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', 'Practice problems on new topics', or 'Final preparation for exams' repeatedly.
-            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic or practical concept found in the text.
+            🔥 ANTI-LAZINESS INTEGRATION LAWS:
+            - NEVER use the generic terms 'Read', 'Study', 'Review', 'Practice', or 'Prepare' by themselves inside a Suggested Action row.
+            - Every study row assignment must begin with an active engineering verb like: 'Code development structures for', 'Solve calculations on', 'Derive algorithms for', 'Debug functions in', or 'Map schematic logic for'. Detail the real concept.
             - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
             
             USER AVAILABILITY CONSTRAINTS:
@@ -180,8 +179,8 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": "You are a linear timeline sequence compiler. You break down syllabus units into precise coding execution steps or calculation blocks. Generic action phrasing like 'Read' or 'Study' is strictly banned."},
+                    {"role": "user", "content": prompt}  # ✅ ACCURATELY CHECKED: Enforced clean key-value syntax with colons
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -195,20 +194,14 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                     continue
             return {"error_mode_active": True, "details": error_msg}
 
-# GRAPHICS THEME SYSTEM (CSS)
+# GRAPHICS THEME SYSTEM (CSS & JS INJECTION)
 st.html("""
 <style>
-    /* ✨ CUSTOM PALETTE RUNTIME ENGINE: BLUE | DARK BLUE | WHITE */
+    /* Blue | Dark Blue | White Gradient Shifter Header */
     .main-title { 
         font-size: 3.8rem !important; 
         font-weight: 800; 
-        background: linear-gradient(
-            90deg, 
-            #0072FF 0%, 
-            #003399 35%, 
-            #FFFFFF 70%, 
-            #0072FF 100%
-        );
+        background: linear-gradient(90deg, #0072FF 0%, #003399 35%, #FFFFFF 70%, #0072FF 100%);
         background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -223,9 +216,78 @@ st.html("""
         100% { background-position: 200% center; }
     }
 
-    div.stButton > button:first-child { background: linear-gradient(90deg, #00C6FF, #0072FF) !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: 600 !important; }
+    /* Force the Spotlight effect container properties onto Streamlit's native button architecture */
+    div.stButton > button {
+        position: relative !important;
+        background: #111827 !important; 
+        color: #FFFFFF !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 8px !important;
+        padding: 14px 28px !important;
+        overflow: hidden !important;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+        width: 100% !important;
+    }
+    
+    div.stButton > button::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+        background: radial-gradient(
+            120px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+            rgba(0, 198, 255, 0.25),
+            transparent 80%
+        ) !important;
+        pointer-events: none !important;
+        z-index: 1 !important;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    div.stButton > button:hover::before {
+        opacity: 1 !important;
+    }
+    
+    div.stButton > button:hover {
+        border-color: rgba(0, 198, 255, 0.5) !important;
+        box-shadow: 0 0 20px rgba(0, 198, 255, 0.2) !important;
+    }
+
+    /* Keep internal button text clear of mask overlay stack layering */
+    div.stButton > button div p {
+        position: relative !important;
+        z-index: 3 !important;
+        color: #FFFFFF !important;
+    }
+
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
+
+<img src="x" onerror="
+    if (!window.hasInteractiveSpotlightRunning) {
+        window.hasInteractiveSpotlightRunning = true;
+        
+        function coordinateTracker(e) {
+            let btn = e.currentTarget;
+            let bounds = btn.getBoundingClientRect();
+            let x = e.clientX - bounds.left;
+            let y = e.clientY - bounds.top;
+            btn.style.setProperty('--mouse-x', x + 'px');
+            btn.style.setProperty('--mouse-y', y + 'px');
+        }
+
+        setInterval(() => {
+            let buttons = Array.from(document.querySelectorAll('div.stButton > button'));
+            buttons.forEach(btn => {
+                if (!btn.hasSpotlightAttached) {
+                    btn.hasSpotlightAttached = true;
+                    btn.addEventListener('mousemove', coordinateTracker);
+                }
+            });
+        }, 300);
+    }
+" style="display:none;"/>
 """)
 
 # ==========================================
