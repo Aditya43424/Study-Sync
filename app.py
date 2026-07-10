@@ -10,10 +10,10 @@ from groq import Groq
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-# 1. PAGE SETUP
+# 1. PAGE SETUP & CONFIGURATION
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
 
-# Persistent State Management Engine
+# Persistent State Engine
 if "user_uid" not in st.session_state:
     st.session_state["user_uid"] = None
 if "user_email" not in st.session_state:
@@ -180,7 +180,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a linear timeline sequence compiler. You break down syllabus units into precise coding execution steps or calculation blocks. Generic action phrasing like 'Read' or 'Study' is strictly banned."},
-                    {"role": "user", "content": prompt}  # ✅ ACCURATELY CHECKED: Enforced clean key-value syntax with colons
+                    {"role": "user", "content": prompt} 
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -209,6 +209,7 @@ st.html("""
         animation: textGradientShift 7s linear infinite;
         margin-bottom: 25px;
         display: inline-block;
+        min-width: 300px; /* Prevents layout layout shifting during character decryption loops */
     }
 
     @keyframes textGradientShift {
@@ -254,7 +255,6 @@ st.html("""
         box-shadow: 0 0 20px rgba(0, 198, 255, 0.2) !important;
     }
 
-    /* Keep internal button text clear of mask overlay stack layering */
     div.stButton > button div p {
         position: relative !important;
         z-index: 3 !important;
@@ -264,10 +264,11 @@ st.html("""
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
 
+<!-- RUNTIME CORE DECRYPTION & CURSOR MATRIX ENGINE HOOKS -->
 <img src="x" onerror="
+    // 1. DAFULAT MOUSE TRACKING MATRIX LISTENER
     if (!window.hasInteractiveSpotlightRunning) {
         window.hasInteractiveSpotlightRunning = true;
-        
         function coordinateTracker(e) {
             let btn = e.currentTarget;
             let bounds = btn.getBoundingClientRect();
@@ -276,7 +277,6 @@ st.html("""
             btn.style.setProperty('--mouse-x', x + 'px');
             btn.style.setProperty('--mouse-y', y + 'px');
         }
-
         setInterval(() => {
             let buttons = Array.from(document.querySelectorAll('div.stButton > button'));
             buttons.forEach(btn => {
@@ -286,6 +286,55 @@ st.html("""
                 }
             });
         }, 300);
+    }
+
+    // 2. ✨ REACT BITS DECRYPTED TEXT DEPLOYMENT ENGINE
+    if (!window.hasTextDecryptionHook) {
+        window.hasTextDecryptionHook = true;
+
+        function triggerDecryptionAnimation(element) {
+            if (element.hasAnimatedNow) return;
+            element.hasAnimatedNow = true;
+
+            const targetText = 'Study Sync';
+            const cryptChars = 'X▰Z▱!@#▣&*?0123456789%▘▚';
+            let frame = 0;
+            const maxFrames = 25;
+
+            const animationLoop = setInterval(() => {
+                let currentRender = '';
+                for (let i = 0; i < targetText.length; i++) {
+                    if (targetText[i] === ' ') {
+                        currentRender += ' ';
+                        continue;
+                    }
+                    // Sequentially lock in strings from left to right as timeline ticks forward
+                    let triggerPoint = i * 2;
+                    if (frame > triggerPoint) {
+                        currentRender += targetText[i];
+                    } else {
+                        currentRender += cryptChars[Math.floor(Math.random() * cryptChars.length)];
+                    }
+                }
+                element.innerText = currentRender;
+
+                if (frame >= maxFrames) {
+                    element.innerText = targetText;
+                    clearInterval(animationLoop);
+                }
+                frame++;
+            }, 55);
+        }
+
+        // Continually check DOM nodes for the mounting title token cell path
+        setInterval(() => {
+            let targets = Array.from(document.querySelectorAll('.main-title'));
+            targets.forEach(el => {
+                if (!el.hasAnimatedNow) {
+                    triggerDecryptionAnimation(el);
+                }
+            });
+        }, 200);
     }
 " style="display:none;"/>
 """)
