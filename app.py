@@ -25,16 +25,15 @@ if "ai_data" not in st.session_state:
 if "page_count" not in st.session_state:
     st.session_state["page_count"] = 0
 
-# --- FIREBASE CLOUD CORE ROUTINES (FIXED: CACHE REMOVED TO PREVENT gRPC SEGFAULTS) ---
+# --- FIREBASE CLOUD CORE ROUTINES ---
 def init_firebase():
-    """Safely connects to Google Cloud Firestore without breaking low-level gRPC threads."""
+    """Safely connects to Google Cloud Firestore without breaking low-level threads."""
     if not firebase_admin._apps:
         fb_credentials = dict(st.secrets["FIREBASE_SECRET"])
         cred = credentials.Certificate(fb_credentials)
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
-# Establish secure native database coupler
 db = init_firebase()
 
 # --- FIREBASE REST AUTHENTICATION SYSTEM ---
@@ -197,7 +196,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                     continue
             return {"error_mode_active": True, "details": error_msg}
 
-# 100% STABLE NATIVE BRAND CUSTOM WEB STYLING (PURE CSS ONLY - NO JAVASCRIPT)
+# 100% STABLE NATIVE BRAND CUSTOM WEB STYLING (PURE CSS ONLY)
 st.html("""
 <style>
     /* Premium Blue | Dark Blue | White Static Gradient Text */
