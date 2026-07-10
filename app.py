@@ -181,7 +181,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content prompt"}
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -195,20 +195,14 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                     continue
             return {"error_mode_active": True, "details": error_msg}
 
-# GRAPHICS THEME SYSTEM (CSS)
+# GRAPHICS THEME SYSTEM (CSS & JS INJECTION)
 st.html("""
 <style>
-    /* ✨ UPDATED: CYBERPUNK NEON PALETTE GRADIENT SHIFTER */
+    /* Gradient text engine setup */
     .main-title { 
         font-size: 3.8rem !important; 
         font-weight: 800; 
-        background: linear-gradient(
-            90deg, 
-            #FF007F 0%, 
-            #7928CA 35%, 
-            #00F2FE 70%, 
-            #FF007F 100%
-        );
+        background: linear-gradient(90deg, #0072FF 0%, #003399 35%, #FFFFFF 70%, #0072FF 100%);
         background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -223,9 +217,66 @@ st.html("""
         100% { background-position: 200% center; }
     }
 
-    div.stButton > button:first-child { background: linear-gradient(90deg, #00C6FF, #0072FF) !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: 600 !important; }
+    /* ✨ NEW: HIGH-FIDELITY MOUSE TRACKING SPOTLIGHT CARD EFFECT ON BUTTON */
+    .spotlight-btn {
+        position: relative !important;
+        background: #111827 !important; /* Rich Dark Background */
+        color: #FFFFFF !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 8px !important;
+        padding: 14px 28px !important;
+        overflow: hidden !important;
+        transition: border-color 0.4s ease, box-shadow 0.4s ease !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    }
+    
+    /* Tracing Glow Overlay using JavaScript Driven Position Variables */
+    .spotlight-btn::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+        background: radial-gradient(
+            100px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+            rgba(0, 198, 255, 0.18),
+            transparent 80%
+        ) !important;
+        pointer-events: none !important;
+        z-index: 1 !important;
+    }
+    
+    /* Force inner child nodes above the canvas highlight mask layer */
+    .spotlight-btn * {
+        position: relative !important;
+        z-index: 2 !important;
+    }
+    
+    .spotlight-btn:hover {
+        border-color: rgba(0, 198, 255, 0.4) !important;
+        box-shadow: 0 0 15px rgba(0, 198, 255, 0.15) !important;
+    }
+
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
+
+<img src="x" onerror="
+    if (!window.hasSpotlightHook) {
+        window.hasSpotlightHook = true;
+        setInterval(() => {
+            let elements = Array.from(document.querySelectorAll('button'));
+            let target = elements.find(el => el.textContent.includes('Generate Optimized Timeline'));
+            if (target && !target.classList.contains('spotlight-btn')) {
+                target.classList.add('spotlight-btn');
+                target.addEventListener('mousemove', (e) => {
+                    let bounds = target.getBoundingClientRect();
+                    let x = e.clientX - bounds.left;
+                    let y = e.clientY - bounds.top;
+                    target.style.setProperty('--mouse-x', x + 'px');
+                    target.style.setProperty('--mouse-y', y + 'px');
+                });
+            }
+        }, 400);
+    }
+" style="display:none;"/>
 """)
 
 # ==========================================
@@ -330,6 +381,7 @@ with right_panel:
     if uploaded_file is not None:
         st.success(f"⚡ Linked with compilation targets: **{uploaded_file.name}**")
         
+        # This button automatically receives the dynamic React Bits style Spotlight tracking overlay!
         if st.button("Generate Optimized Timeline", use_container_width=True):
             start_minutes = free_from.hour * 60 + free_from.minute
             end_minutes = free_until.hour * 60 + free_until.minute
