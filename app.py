@@ -180,10 +180,10 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a linear timeline sequence compiler. You break down syllabus units into precise coding execution steps or calculation blocks. Generic action phrasing like 'Read' or 'Study' is strictly banned."},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt}  # Syntax verified parameter matching
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=6000  # Protected buffer gate to stay beneath 12k TPM ceiling
+                max_tokens=6000  # Buffering cap to remain beneath free 12k TPM ceiling
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
@@ -194,71 +194,36 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                     continue
             return {"error_mode_active": True, "details": error_msg}
 
-# 100% STABLE GRAPHICS THEME SYSTEM (PURE CSS ONLY - NO DOM-MUTATING JAVASCRIPT)
+# 100% STABLE NATIVE BRAND CUSTOM WEB STYLING (PURE CSS ONLY - NO JAVASCRIPT)
 st.html("""
 <style>
-    /* Blue | Dark Blue | White Gradient Shifter Header */
+    /* Premium Blue | Dark Blue | White Static Gradient Text */
     .main-title { 
         font-size: 3.8rem !important; 
         font-weight: 800; 
-        background: linear-gradient(90deg, #0072FF 0%, #003399 35%, #FFFFFF 70%, #0072FF 100%);
-        background-size: 200% auto;
+        background: linear-gradient(90deg, #0072FF 0%, #003399 50%, #FFFFFF 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        animation: textGradientShift 6s linear infinite;
         margin-bottom: 25px;
         display: inline-block;
     }
 
-    @keyframes textGradientShift {
-        0% { background-position: 0% center; }
-        100% { background-position: 200% center; }
-    }
-
-    /* ✨ PURE CSS SPOTLIGHT HOVER GLOW EFFECT (Completely Safe for Streamlit/React) */
-    div.stButton > button {
-        position: relative !important;
-        background: #111827 !important; 
-        color: #FFFFFF !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        border-radius: 8px !important;
-        padding: 14px 28px !important;
-        overflow: hidden !important;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    /* Stable Custom Blue Interface Button Themes */
+    div.stButton > button:first-child {
+        background: linear-gradient(90deg, #0072FF, #003399) !important; 
+        color: white !important; 
+        border: none !important; 
+        border-radius: 8px !important; 
+        padding: 12px 24px !important;
+        font-weight: 600 !important;
         width: 100% !important;
-    }
-    
-    /* Radial spotlight glow overlay centered natively by CSS layout vectors */
-    div.stButton > button::before {
-        content: '' !important;
-        position: absolute !important;
-        top: 50% !important; left: 50% !important;
-        width: 180px !important; height: 180px !important;
-        transform: translate(-50%, -50%) scale(0.5) !important;
-        background: radial-gradient(circle, rgba(0, 198, 255, 0.25) 0%, transparent 70%) !important;
-        pointer-events: none !important;
-        z-index: 1 !important;
-        opacity: 0;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: transform 0.2s ease, opacity 0.2s ease !important;
     }
 
-    div.stButton > button:hover::before {
-        opacity: 1 !important;
-        transform: translate(-50%, -50%) scale(1.2) !important;
-    }
-    
-    div.stButton > button:hover {
-        border-color: rgba(0, 198, 255, 0.5) !important;
-        box-shadow: 0 0 25px rgba(0, 198, 255, 0.25) !important;
-        background: #131c2e !important;
-    }
-
-    div.stButton > button div p {
-        position: relative !important;
-        z-index: 3 !important;
-        color: #FFFFFF !important;
+    div.stButton > button:first-child:hover {
+        opacity: 0.95 !important;
+        transform: translateY(-1px);
     }
 
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
