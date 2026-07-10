@@ -160,9 +160,11 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
             - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
             
-            🔥 ANTI-LAZINESS INTEGRATION LAWS:
-            - NEVER use the generic terms 'Read', 'Study', 'Review', 'Practice', or 'Prepare' by themselves inside a Suggested Action row.
-            - Every study row assignment must begin with an active engineering verb like: 'Code development structures for', 'Solve calculations on', 'Derive algorithms for', 'Debug functions in', or 'Map schematic logic for'. Detail the real concept.
+            🔥 ANTI-LAZINESS & VARIETY LAWS:
+            - NEVER use generic words like 'Read', 'Study', 'Review', 'Practice', or 'Prepare' by themselves.
+            - STRICTLY FORBIDDEN: Do not repeat the same prefix phrase style continuously across multiple rows. Avoid structural loops (like starting every row with 'Code development structures for' or 'Derive algorithms for').
+            - Every single Suggested Action ('a') must be an organically phrased, unique instruction sentence tailored to the topic using diverse verbs.
+            - Mix up sentence layouts. Use specific directives like: 'Build an script that handles...', 'Write code to execute...', 'Configure a clean environment layout for...', 'Trace execution outputs of...', 'Design an interactive setup demonstrating...', 'Analyze the performance properties of...', or 'Debug potential boundary faults within...'.
             - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
             
             USER AVAILABILITY CONSTRAINTS:
@@ -179,11 +181,11 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler. You break down syllabus units into precise coding execution steps or calculation blocks. Generic action phrasing like 'Read' or 'Study' is strictly banned."},
-                    {"role": "user", "content": prompt}  # Syntax verified parameter matching
+                    {"role": "system", "content": "You are a versatile academic curriculum architect. You break down units into specific development assignments. You use high vocabulary variety and completely avoid repetitive phrase loops, templates, or the word 'Read'."},
+                    {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=6000  # Buffering cap to remain beneath free 12k TPM ceiling
+                max_tokens=6000  
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
