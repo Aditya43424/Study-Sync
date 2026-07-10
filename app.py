@@ -13,7 +13,7 @@ from firebase_admin import credentials, firestore
 # 1. PAGE SETUP & CONFIGURATION
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
 
-# Persistent State Engine
+# Persistent State Management Engine
 if "user_uid" not in st.session_state:
     st.session_state["user_uid"] = None
 if "user_email" not in st.session_state:
@@ -180,10 +180,10 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a linear timeline sequence compiler. You break down syllabus units into precise coding execution steps or calculation blocks. Generic action phrasing like 'Read' or 'Study' is strictly banned."},
-                    {"role": "user", "content": prompt} 
+                    {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=6000  
+                max_tokens=6000  # Protected buffer gate to stay beneath 12k TPM ceiling
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
@@ -194,7 +194,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                     continue
             return {"error_mode_active": True, "details": error_msg}
 
-# GRAPHICS THEME SYSTEM (CSS & JS INJECTION)
+# GRAPHICS THEME SYSTEM (CSS & SCRIPT ENGINES)
 st.html("""
 <style>
     /* Blue | Dark Blue | White Gradient Shifter Header */
@@ -209,7 +209,7 @@ st.html("""
         animation: textGradientShift 7s linear infinite;
         margin-bottom: 25px;
         display: inline-block;
-        min-width: 300px; /* Prevents layout layout shifting during character decryption loops */
+        min-width: 320px;
     }
 
     @keyframes textGradientShift {
@@ -217,7 +217,7 @@ st.html("""
         100% { background-position: 200% center; }
     }
 
-    /* Force the Spotlight effect container properties onto Streamlit's native button architecture */
+    /* Native button styling modification container rules */
     div.stButton > button {
         position: relative !important;
         background: #111827 !important; 
@@ -264,11 +264,11 @@ st.html("""
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
 
-<!-- RUNTIME CORE DECRYPTION & CURSOR MATRIX ENGINE HOOKS -->
-<img src="x" onerror="
-    // 1. DAFULAT MOUSE TRACKING MATRIX LISTENER
+<script>
+    /* 1. IMMUTABLE SPOLIGHT CURSOR MATRIX TRACKER */
     if (!window.hasInteractiveSpotlightRunning) {
         window.hasInteractiveSpotlightRunning = true;
+        
         function coordinateTracker(e) {
             let btn = e.currentTarget;
             let bounds = btn.getBoundingClientRect();
@@ -277,6 +277,7 @@ st.html("""
             btn.style.setProperty('--mouse-x', x + 'px');
             btn.style.setProperty('--mouse-y', y + 'px');
         }
+
         setInterval(() => {
             let buttons = Array.from(document.querySelectorAll('div.stButton > button'));
             buttons.forEach(btn => {
@@ -288,7 +289,7 @@ st.html("""
         }, 300);
     }
 
-    // 2. ✨ REACT BITS DECRYPTED TEXT DEPLOYMENT ENGINE
+    /* 2. REACT BITS DECRYPTED TEXT ENGINE LAYER */
     if (!window.hasTextDecryptionHook) {
         window.hasTextDecryptionHook = true;
 
@@ -308,7 +309,6 @@ st.html("""
                         currentRender += ' ';
                         continue;
                     }
-                    // Sequentially lock in strings from left to right as timeline ticks forward
                     let triggerPoint = i * 2;
                     if (frame > triggerPoint) {
                         currentRender += targetText[i];
@@ -326,7 +326,6 @@ st.html("""
             }, 55);
         }
 
-        // Continually check DOM nodes for the mounting title token cell path
         setInterval(() => {
             let targets = Array.from(document.querySelectorAll('.main-title'));
             targets.forEach(el => {
@@ -336,7 +335,7 @@ st.html("""
             });
         }, 200);
     }
-" style="display:none;"/>
+</script>
 """)
 
 # ==========================================
