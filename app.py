@@ -25,16 +25,16 @@ if "ai_data" not in st.session_state:
 if "page_count" not in st.session_state:
     st.session_state["page_count"] = 0
 
-# --- FIREBASE CLOUD CORE ROUTINES (CACHED TO PREVENT SEGFAULTS) ---
-@st.cache_resource
+# --- FIREBASE CLOUD CORE ROUTINES (FIXED: CACHE REMOVED TO PREVENT gRPC SEGFAULTS) ---
 def init_firebase():
-    """Establishes connection to Google Cloud Firestore containers securely exactly once."""
+    """Safely connects to Google Cloud Firestore without breaking low-level gRPC threads."""
     if not firebase_admin._apps:
         fb_credentials = dict(st.secrets["FIREBASE_SECRET"])
         cred = credentials.Certificate(fb_credentials)
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
+# Establish secure native database coupler
 db = init_firebase()
 
 # --- FIREBASE REST AUTHENTICATION SYSTEM ---
@@ -246,7 +246,6 @@ if st.session_state["user_uid"] is None:
             li_username = st.text_input("Username / Roll Number:", value="Aditya").strip()
             li_email = st.text_input("Email Address:")
             li_password = st.text_input("Password:", type="password")
-            # ✨ FIXED: Changed use_container_width to modern width property
             submit_login = st.form_submit_button("Access Profile Console", width="stretch")
             
             if submit_login:
@@ -273,7 +272,6 @@ if st.session_state["user_uid"] is None:
             su_username = st.text_input("Choose Unique Username / Roll Number:").strip()
             su_email = st.text_input("Email Address Registration Target:")
             su_password = st.text_input("Configure Strong Password:", type="password", help="Must be minimum 6 characters long")
-            # ✨ FIXED: Changed use_container_width to modern width property
             submit_signup = st.form_submit_button("Register Cloud Profile Key", width="stretch")
             
             if submit_signup:
@@ -301,7 +299,6 @@ st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
 
 profile_col1, profile_col2 = st.columns([5, 1])
 profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}**")
-# ✨ FIXED: Changed use_container_width to modern width property
 if profile_col2.button("🚪 Log Out", width="stretch"):
     st.session_state["user_uid"] = None
     st.session_state["user_email"] = None
@@ -338,7 +335,6 @@ with right_panel:
     if uploaded_file is not None:
         st.success(f"⚡ Linked with compilation targets: **{uploaded_file.name}**")
         
-        # ✨ FIXED: Changed use_container_width to modern width property
         if st.button("Generate Optimized Timeline", width="stretch"):
             start_minutes = free_from.hour * 60 + free_from.minute
             end_minutes = free_until.hour * 60 + free_until.minute
@@ -412,7 +408,6 @@ with right_panel:
         
         with t_col1:
             st.markdown("#### 📅 Calendar Targets")
-            # ✨ FIXED: Changed use_container_width to modern width property
             st.dataframe(st.session_state["ai_data"]["tasks"], width="stretch")
             
         with t_col2:
@@ -425,7 +420,6 @@ with right_panel:
             st.markdown(f"<p style='font-size:0.85rem; color:#A0AEC0;'>Tracker Completion: {completed_items}/{total_items} Items Completed ({completion_percentage}%)</p>", unsafe_allow_html=True)
             st.progress(completed_items / total_items if total_items > 0 else 0.0)
             
-            # ✨ FIXED: Changed use_container_width to modern width property
             edited_roadmap = st.data_editor(
                 roadmap_df,
                 width="stretch",
@@ -442,8 +436,6 @@ with right_panel:
             st.markdown("<br>", unsafe_allow_html=True)
             d_col1, d_col2 = st.columns(2)
             with d_col1:
-                # ✨ FIXED: Changed use_container_width to modern width property
                 st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{st.session_state['username_val']}_schedule.ics", mime="text/calendar", width="stretch")
             with d_col2:
-                # ✨ FIXED: Changed use_container_width to modern width property
                 st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{st.session_state['username_val']}_checklist.csv", mime="text/csv", width="stretch")
