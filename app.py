@@ -159,11 +159,11 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             CRITICAL LINEAR SEQUENCE RULE:
             - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
             - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
-            - When you encounter 'Semester 2' or 'Second Semester' milestones, look directly at the lines following it and extract the real technical lesson topics.
             
-            STRICT FILLER BAN RULE:
-            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', 'Practice problems on new topics', or 'Final preparation for exams' repeatedly.
-            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic or practical concept found in the text.
+            🔥 ANTI-LAZINESS DRILL DOWN LAWS:
+            - NEVER use the generic words "Read", "Study", "Review", "Practice", or "Prepare" by themselves at the start of a Suggested Action (e.g., Avoid 'Read UNIT-I').
+            - Every 'Suggested Action' ('a') must start with a highly specific, technical, and concrete engineering action verb such as: 'Implement', 'Code', 'Solve calculations for', 'Derive equations for', 'Map architecture flow of', 'Configure environments for', or 'Debug lines in'.
+            - Break down the general units into their actual sub-topics found in the text payload. If a row focuses on a programming concept, outline exactly what part of the concept to code.
             - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
             
             USER AVAILABILITY CONSTRAINTS:
@@ -180,8 +180,8 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
-                    {"role": "user", "content": prompt}  # ✨ FIXED: Changed from "content prompt" to valid dictionary syntax
+                    {"role": "system", "content": "You are a granular computer engineering curriculum sequence transformer. You strictly break down high level course units into their deepest technical code elements and equation practices. You are strictly forbidden from outputting generic words like 'Read' or 'Study' inside your task actions."},
+                    {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -212,71 +212,81 @@ st.html("""
         display: inline-block;
     }
 
-    @-webkit-keyframes textGradientShift {
-        0% { background-position: 0% center; }
-        100% { background-position: 200% center; }
-    }
     @keyframes textGradientShift {
         0% { background-position: 0% center; }
         100% { background-position: 200% center; }
     }
 
-    /* Mouse Tracking Spotlight Card Effect Styling */
-    .spotlight-btn {
+    /* ✨ STRUCTURAL FIX: Force the Spotlight effect container properties onto Streamlit's native button architecture */
+    div.stButton > button {
         position: relative !important;
         background: #111827 !important; 
         color: #FFFFFF !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
         border-radius: 8px !important;
         padding: 14px 28px !important;
         overflow: hidden !important;
-        transition: border-color 0.4s ease, box-shadow 0.4s ease !important;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+        width: 100% !important;
     }
     
-    .spotlight-btn::before {
+    div.stButton > button::before {
         content: '' !important;
         position: absolute !important;
         top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
         background: radial-gradient(
-            100px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
-            rgba(0, 198, 255, 0.18),
+            120px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+            rgba(0, 198, 255, 0.25),
             transparent 80%
         ) !important;
         pointer-events: none !important;
         z-index: 1 !important;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    div.stButton > button:hover::before {
+        opacity: 1 !important;
     }
     
-    .spotlight-btn * {
+    div.stButton > button:hover {
+        border-color: rgba(0, 198, 255, 0.5) !important;
+        box-shadow: 0 0 20px rgba(0, 198, 255, 0.2) !important;
+    }
+
+    /* Keep internal button text clear of mask overlay stack layering */
+    div.stButton > button div p {
         position: relative !important;
-        z-index: 2 !important;
-    }
-    
-    .spotlight-btn:hover {
-        border-color: rgba(0, 198, 255, 0.4) !important;
-        box-shadow: 0 0 15px rgba(0, 198, 255, 0.15) !important;
+        z-index: 3 !important;
+        color: #FFFFFF !important;
     }
 
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
 
 <img src="x" onerror="
-    if (!window.hasSpotlightHook) {
-        window.hasSpotlightHook = true;
+    if (!window.hasInteractiveSpotlightRunning) {
+        window.hasInteractiveSpotlightRunning = true;
+        
+        function coordinateTracker(e) {
+            let btn = e.currentTarget;
+            let bounds = btn.getBoundingClientRect();
+            let x = e.clientX - bounds.left;
+            let y = e.clientY - bounds.top;
+            btn.style.setProperty('--mouse-x', x + 'px');
+            btn.style.setProperty('--mouse-y', y + 'px');
+        }
+
         setInterval(() => {
-            let elements = Array.from(document.querySelectorAll('button'));
-            let target = elements.find(el => el.textContent.includes('Generate Optimized Timeline'));
-            if (target && !target.classList.contains('spotlight-btn')) {
-                target.classList.add('spotlight-btn');
-                target.addEventListener('mousemove', (e) => {
-                    let bounds = target.getBoundingClientRect();
-                    let x = e.clientX - bounds.left;
-                    let y = e.clientY - bounds.top;
-                    target.style.setProperty('--mouse-x', x + 'px');
-                    target.style.setProperty('--mouse-y', y + 'px');
-                });
-            }
-        }, 400);
+            let buttons = Array.from(document.querySelectorAll('div.stButton > button'));
+            buttons.forEach(btn => {
+                if (!btn.hasSpotlightAttached) {
+                    btn.hasSpotlightAttached = true;
+                    btn.addEventListener('mousemove', coordinateTracker);
+                }
+            });
+        }, 300);
     }
 " style="display:none;"/>
 """)
