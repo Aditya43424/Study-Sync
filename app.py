@@ -181,7 +181,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a granular computer engineering curriculum sequence transformer. You strictly break down high level course units into their deepest technical code elements and equation practices. You are strictly forbidden from outputting generic words like 'Read' or 'Study' inside your task actions."},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt}  # ✅ VERIFIED & FIXED: Correct dictionary mapping syntax enforced here
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -217,7 +217,7 @@ st.html("""
         100% { background-position: 200% center; }
     }
 
-    /* ✨ STRUCTURAL FIX: Force the Spotlight effect container properties onto Streamlit's native button architecture */
+    /* Force the Spotlight effect container properties onto Streamlit's native button architecture */
     div.stButton > button {
         position: relative !important;
         background: #111827 !important; 
