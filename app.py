@@ -245,7 +245,8 @@ if st.session_state["user_uid"] is None:
             li_username = st.text_input("Username / Roll Number:", value="Aditya").strip()
             li_email = st.text_input("Email Address:")
             li_password = st.text_input("Password:", type="password")
-            submit_login = st.form_submit_button("Access Profile Console", use_container_width=True)
+            # Fixed: Updated use_container_width to width="stretch"
+            submit_login = st.form_submit_button("Access Profile Console", width="stretch")
             
             if submit_login:
                 if not li_username:
@@ -271,7 +272,8 @@ if st.session_state["user_uid"] is None:
             su_username = st.text_input("Choose Unique Username / Roll Number:").strip()
             su_email = st.text_input("Email Address Registration Target:")
             su_password = st.text_input("Configure Strong Password:", type="password", help="Must be minimum 6 characters long")
-            submit_signup = st.form_submit_button("Register Cloud Profile Key", use_container_width=True)
+            # Fixed: Updated use_container_width to width="stretch"
+            submit_signup = st.form_submit_button("Register Cloud Profile Key", width="stretch")
             
             if submit_signup:
                 if not su_username:
@@ -298,7 +300,8 @@ st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
 
 profile_col1, profile_col2 = st.columns([5, 1])
 profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}**")
-if profile_col2.button("🚪 Log Out", use_container_width=True):
+# Fixed: Updated use_container_width to width="stretch"
+if profile_col2.button("🚪 Log Out", width="stretch"):
     st.session_state["user_uid"] = None
     st.session_state["user_email"] = None
     st.session_state["ai_data"] = None
@@ -334,7 +337,8 @@ with right_panel:
     if uploaded_file is not None:
         st.success(f"⚡ Linked with compilation targets: **{uploaded_file.name}**")
         
-        if st.button("Generate Optimized Timeline", use_container_width=True):
+        # Fixed: Updated use_container_width to width="stretch"
+        if st.button("Generate Optimized Timeline", width="stretch"):
             start_minutes = free_from.hour * 60 + free_from.minute
             end_minutes = free_until.hour * 60 + free_until.minute
             available_duration_hours = (end_minutes - start_minutes) / 60
@@ -344,9 +348,9 @@ with right_panel:
                 st.stop()
             
             progress_bar = st.progress(0)
-            status_message = st.empty()
+            st.empty()
             
-            status_message.markdown('🔄 Parsing PDF text metadata structures...')
+            st.markdown('🔄 Parsing PDF text metadata structures...')
             progress_bar.progress(25)
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
@@ -363,7 +367,7 @@ with right_panel:
             if len(condensed_syllabus) > 14000:
                 condensed_syllabus = condensed_syllabus[:14000]
             
-            status_message.markdown('🚀 Dispatching datasets directly to Core hardware arrays...')
+            st.markdown('🚀 Dispatching datasets directly to Core hardware arrays...')
             progress_bar.progress(50)
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
             
@@ -372,7 +376,7 @@ with right_panel:
                 st.code(raw_ai_output["details"])
                 st.stop()
             
-            status_message.markdown('📊 Inflating matrix shorthands to layout configurations...')
+            st.markdown('📊 Inflating matrix shorthands to layout configurations...')
             progress_bar.progress(75)
             mapped_tasks = [{"task_name": item.get("n", "Milestone Target"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
             mapped_plan = [
@@ -391,7 +395,6 @@ with right_panel:
             save_schedule_to_firebase(st.session_state["username_val"], mapped_tasks, mapped_plan)
             
             progress_bar.progress(100)
-            status_message.empty()
             st.rerun()
 
     # --- MAIN VIEWING STAGE ---
@@ -409,7 +412,8 @@ with right_panel:
         
         with t_col1:
             st.markdown("#### 📅 Calendar Targets")
-            st.dataframe(st.session_state["ai_data"]["tasks"], use_container_width=True)
+            # Fixed: Updated use_container_width to width="stretch"
+            st.dataframe(st.session_state["ai_data"]["tasks"], width="stretch")
             
         with t_col2:
             st.markdown("#### 🔄 Dynamic Interactive Roadmap Checklist")
@@ -421,9 +425,10 @@ with right_panel:
             st.markdown(f"<p style='font-size:0.85rem; color:#A0AEC0;'>Tracker Completion: {completed_items}/{total_items} Items Completed ({completion_percentage}%)</p>", unsafe_allow_html=True)
             st.progress(completed_items / total_items if total_items > 0 else 0.0)
             
+            # Fixed: Updated use_container_width to width="stretch"
             edited_roadmap = st.data_editor(
                 roadmap_df,
-                use_container_width=True,
+                width="stretch",
                 disabled=["Scheduled Date", "Time Slot", "Focus Topic", "Suggested Action", "Hours Allocated"],
                 hide_index=True,
                 key="roadmap_editor"
@@ -437,6 +442,8 @@ with right_panel:
             st.markdown("<br>", unsafe_allow_html=True)
             d_col1, d_col2 = st.columns(2)
             with d_col1:
-                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{st.session_state['username_val']}_schedule.ics", mime="text/calendar", use_container_width=True)
+                # Fixed: Updated use_container_width to width="stretch"
+                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{st.session_state['username_val']}_schedule.ics", mime="text/calendar", width="stretch")
             with d_col2:
-                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{st.session_state['username_val']}_checklist.csv", mime="text/csv", use_container_width=True)
+                # Fixed: Updated use_container_width to width="stretch"
+                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{st.session_state['username_val']}_checklist.csv", mime="text/csv", width="stretch")
