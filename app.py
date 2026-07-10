@@ -181,7 +181,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
-                    {"role": "user", "content prompt"}
+                    {"role": "user", "content": prompt}  # ✨ FIXED: Resolved the dict SyntaxError typo here
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=6000  
@@ -198,7 +198,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
 # GRAPHICS THEME SYSTEM (CSS & JS INJECTION)
 st.html("""
 <style>
-    /* Gradient text engine setup */
+    /* Blue | Dark Blue | White Gradient Shifter */
     .main-title { 
         font-size: 3.8rem !important; 
         font-weight: 800; 
@@ -212,15 +212,19 @@ st.html("""
         display: inline-block;
     }
 
+    @webkit-keyframes textGradientShift {
+        0% { background-position: 0% center; }
+        100% { background-position: 200% center; }
+    }
     @keyframes textGradientShift {
         0% { background-position: 0% center; }
         100% { background-position: 200% center; }
     }
 
-    /* ✨ NEW: HIGH-FIDELITY MOUSE TRACKING SPOTLIGHT CARD EFFECT ON BUTTON */
+    /* Mouse Tracking Spotlight Card Effect Styling */
     .spotlight-btn {
         position: relative !important;
-        background: #111827 !important; /* Rich Dark Background */
+        background: #111827 !important; 
         color: #FFFFFF !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-radius: 8px !important;
@@ -230,7 +234,6 @@ st.html("""
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     }
     
-    /* Tracing Glow Overlay using JavaScript Driven Position Variables */
     .spotlight-btn::before {
         content: '' !important;
         position: absolute !important;
@@ -244,7 +247,6 @@ st.html("""
         z-index: 1 !important;
     }
     
-    /* Force inner child nodes above the canvas highlight mask layer */
     .spotlight-btn * {
         position: relative !important;
         z-index: 2 !important;
@@ -381,7 +383,6 @@ with right_panel:
     if uploaded_file is not None:
         st.success(f"⚡ Linked with compilation targets: **{uploaded_file.name}**")
         
-        # This button automatically receives the dynamic React Bits style Spotlight tracking overlay!
         if st.button("Generate Optimized Timeline", use_container_width=True):
             start_minutes = free_from.hour * 60 + free_from.minute
             end_minutes = free_until.hour * 60 + free_until.minute
