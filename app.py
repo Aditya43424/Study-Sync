@@ -194,7 +194,7 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
                     continue
             return {"error_mode_active": True, "details": error_msg}
 
-# GRAPHICS THEME SYSTEM (CSS & SCRIPT ENGINES)
+# 100% STABLE GRAPHICS THEME SYSTEM (PURE CSS ONLY - NO DOM-MUTATING JAVASCRIPT)
 st.html("""
 <style>
     /* Blue | Dark Blue | White Gradient Shifter Header */
@@ -206,10 +206,9 @@ st.html("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        animation: textGradientShift 7s linear infinite;
+        animation: textGradientShift 6s linear infinite;
         margin-bottom: 25px;
         display: inline-block;
-        min-width: 320px;
     }
 
     @keyframes textGradientShift {
@@ -217,7 +216,7 @@ st.html("""
         100% { background-position: 200% center; }
     }
 
-    /* Native button styling modification container rules */
+    /* ✨ PURE CSS SPOTLIGHT HOVER GLOW EFFECT (Completely Safe for Streamlit/React) */
     div.stButton > button {
         position: relative !important;
         background: #111827 !important; 
@@ -226,33 +225,34 @@ st.html("""
         border-radius: 8px !important;
         padding: 14px 28px !important;
         overflow: hidden !important;
-        transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
         width: 100% !important;
     }
     
+    /* Radial spotlight glow overlay centered natively by CSS layout vectors */
     div.stButton > button::before {
         content: '' !important;
         position: absolute !important;
-        top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-        background: radial-gradient(
-            120px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
-            rgba(0, 198, 255, 0.25),
-            transparent 80%
-        ) !important;
+        top: 50% !important; left: 50% !important;
+        width: 180px !important; height: 180px !important;
+        transform: translate(-50%, -50%) scale(0.5) !important;
+        background: radial-gradient(circle, rgba(0, 198, 255, 0.25) 0%, transparent 70%) !important;
         pointer-events: none !important;
         z-index: 1 !important;
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
 
     div.stButton > button:hover::before {
         opacity: 1 !important;
+        transform: translate(-50%, -50%) scale(1.2) !important;
     }
     
     div.stButton > button:hover {
         border-color: rgba(0, 198, 255, 0.5) !important;
-        box-shadow: 0 0 20px rgba(0, 198, 255, 0.2) !important;
+        box-shadow: 0 0 25px rgba(0, 198, 255, 0.25) !important;
+        background: #131c2e !important;
     }
 
     div.stButton > button div p {
@@ -263,79 +263,6 @@ st.html("""
 
     .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
-
-<script>
-    /* 1. IMMUTABLE SPOLIGHT CURSOR MATRIX TRACKER */
-    if (!window.hasInteractiveSpotlightRunning) {
-        window.hasInteractiveSpotlightRunning = true;
-        
-        function coordinateTracker(e) {
-            let btn = e.currentTarget;
-            let bounds = btn.getBoundingClientRect();
-            let x = e.clientX - bounds.left;
-            let y = e.clientY - bounds.top;
-            btn.style.setProperty('--mouse-x', x + 'px');
-            btn.style.setProperty('--mouse-y', y + 'px');
-        }
-
-        setInterval(() => {
-            let buttons = Array.from(document.querySelectorAll('div.stButton > button'));
-            buttons.forEach(btn => {
-                if (!btn.hasSpotlightAttached) {
-                    btn.hasSpotlightAttached = true;
-                    btn.addEventListener('mousemove', coordinateTracker);
-                }
-            });
-        }, 300);
-    }
-
-    /* 2. REACT BITS DECRYPTED TEXT ENGINE LAYER */
-    if (!window.hasTextDecryptionHook) {
-        window.hasTextDecryptionHook = true;
-
-        function triggerDecryptionAnimation(element) {
-            if (element.hasAnimatedNow) return;
-            element.hasAnimatedNow = true;
-
-            const targetText = 'Study Sync';
-            const cryptChars = 'X▰Z▱!@#▣&*?0123456789%▘▚';
-            let frame = 0;
-            const maxFrames = 25;
-
-            const animationLoop = setInterval(() => {
-                let currentRender = '';
-                for (let i = 0; i < targetText.length; i++) {
-                    if (targetText[i] === ' ') {
-                        currentRender += ' ';
-                        continue;
-                    }
-                    let triggerPoint = i * 2;
-                    if (frame > triggerPoint) {
-                        currentRender += targetText[i];
-                    } else {
-                        currentRender += cryptChars[Math.floor(Math.random() * cryptChars.length)];
-                    }
-                }
-                element.innerText = currentRender;
-
-                if (frame >= maxFrames) {
-                    element.innerText = targetText;
-                    clearInterval(animationLoop);
-                }
-                frame++;
-            }, 55);
-        }
-
-        setInterval(() => {
-            let targets = Array.from(document.querySelectorAll('.main-title'));
-            targets.forEach(el => {
-                if (!el.hasAnimatedNow) {
-                    triggerDecryptionAnimation(el);
-                }
-            });
-        }, 200);
-    }
-</script>
 """)
 
 # ==========================================
