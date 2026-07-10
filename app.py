@@ -198,16 +198,16 @@ def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, star
 # GRAPHICS THEME SYSTEM (CSS)
 st.html("""
 <style>
-    /* ✨ UPDATED: CYBERPUNK NEON PALETTE GRADIENT SHIFTER */
+    /* ✨ CUSTOM PALETTE RUNTIME ENGINE: BLUE | DARK BLUE | WHITE */
     .main-title { 
         font-size: 3.8rem !important; 
         font-weight: 800; 
         background: linear-gradient(
             90deg, 
-            #FF007F 0%, 
-            #7928CA 35%, 
-            #00F2FE 70%, 
-            #FF007F 100%
+            #0072FF 0%, 
+            #003399 35%, 
+            #FFFFFF 70%, 
+            #0072FF 100%
         );
         background-size: 200% auto;
         -webkit-background-clip: text;
