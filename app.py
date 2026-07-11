@@ -6,26 +6,97 @@ import fitz  # PyMuPDF
 import pandas as pd
 import uuid  
 from datetime import datetime, timedelta, time as dt_time 
-from streamlit_lottie import st_lottie
-import streamlit.components.v1 as components
-from pydantic import BaseModel
 from groq import Groq  
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 # 1. PAGE SETUP
 st.set_page_config(page_title="Study Sync", page_icon="📅", layout="wide")
 
+# Persistent State Management Engine
+if "user_uid" not in st.session_state:
+    st.session_state["user_uid"] = None
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = None
+if "username_val" not in st.session_state:
+    st.session_state["username_val"] = "Aditya"
 if "ai_data" not in st.session_state:
     st.session_state["ai_data"] = None
 if "page_count" not in st.session_state:
     st.session_state["page_count"] = 0
 
-# 2. HELPER FUNCTIONS
-def load_lottie_url(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
+# --- FIREBASE CLOUD CORE ROUTINES ---
+def init_firebase():
+    """Establishes connection to Google Cloud Firestore containers securely."""
+    if not firebase_admin._apps:
+        fb_credentials = dict(st.secrets["FIREBASE_SECRET"])
+        cred = credentials.Certificate(fb_credentials)
+        firebase_admin.initialize_app(cred)
+    return firestore.client()
 
+db = init_firebase()
+
+# --- FIREBASE REST AUTHENTICATION SYSTEM ---
+def firebase_auth_request(endpoint, email, password):
+    """Routes validation checks to Google Cloud's Secure Identity Gateway REST API."""
+    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:{endpoint}?key={api_key}"
+    payload = {"email": email, "password": password, "returnSecureToken": True}
+    
+    response = requests.post(url, json=payload)
+    return response.json()
+
+# --- FIREBASE FIRESTORE DATA COUPLERS ---
+def save_schedule_to_firebase(profile_name, tasks_list, plan_list):
+    """Commits user milestones directly to the specified username profile cell."""
+    try:
+        clean_tasks = [{"task_name": t.get("n", t.get("task_name", "Unknown")), "due_date": t.get("d", t.get("due_date", ""))} for t in tasks_list]
+        clean_plan = [
+            {
+                "Status": True if item.get("Status") == True else False,
+                "Scheduled Date": item.get("d", item.get("Scheduled Date", "")),
+                "Time Slot": item.get("t", item.get("Time Slot", "")),
+                "Focus Topic": item.get("f", item.get("Focus Topic", "")),
+                "Suggested Action": item.get("a", item.get("Suggested Action", "")),
+                "Hours Allocated": item.get("h", item.get("Hours Allocated", 2))
+            } for item in plan_list
+        ]
+        
+        user_doc_ref = db.collection("users").document(profile_name)
+        user_doc_ref.set({
+            "tasks": clean_tasks,
+            "study_plan": clean_plan,
+            "last_updated": firestore.SERVER_TIMESTAMP
+        })
+        return True
+    except Exception as e:
+        st.error(f"Cloud Storage Warning: {e}")
+        return False
+
+def load_schedule_from_firebase(profile_name):
+    """Pulls persistent user records out of specific Firestore username profile paths."""
+    try:
+        user_doc_ref = db.collection("users").document(profile_name)
+        doc = user_doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            tasks = [{"task_name": t["task_name"], "due_date": t["due_date"]} for t in data.get("tasks", [])]
+            study_plan = [
+                {
+                    "Status": item["Status"],
+                    "Scheduled Date": item["Scheduled Date"],
+                    "Time Slot": item["Time Slot"],
+                    "Focus Topic": item["Focus Topic"],
+                    "Suggested Action": item["Suggested Action"],
+                    "Hours Allocated": item["Hours Allocated"]
+                } for item in data.get("study_plan", [])
+            ]
+            return {"tasks": tasks, "study_plan": study_plan}
+        return None
+    except Exception as e:
+        return None
+
+# 2. CALENDAR GENERATION ROUTINE
 def generate_ics_file(study_dataframe):
     nl = "\r\n"
     current_timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
@@ -65,81 +136,187 @@ def generate_ics_file(study_dataframe):
     ics_text += f"END:VCALENDAR"
     return ics_text
 
-# --- UNLOCKED HIGH-VOLUME GROQ CORE ENGINE ---
+# --- CHRONOLOGICAL EXPANSION GROQ ENGINE ---
 def extract_syllabus_with_ai(condensed_text, hours, intensity, no_weekends, start_hr, end_hr):
-    try:
-        client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-        weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
-        
-        prompt = f"""
-        You are an elite academic strategy coach. Analyze the filtered syllabus data text and output a valid JSON string object.
-        The JSON object must contain exactly two array fields:
-        1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
-        2. "study_plan": an array of objects containing:
-           - "d": scheduled date (YYYY-MM-DD)
-           - "t": time slot window string
-           - "f": focus topic (extract the actual specific lesson topic or conceptual chapter name from the text)
-           - "a": suggested actionable study item
-           - "h": hours allocated (integer)
-        
-        CRITICAL OUTPUT VOLUME RULES:
-        - NEVER write generic placeholder lines like 'Read Unit-I' or 'Solve questions' repeatedly.
-        - Look deeply into all modules and concept paths provided in the document text. Break topics down day-by-day (e.g., 'Object Oriented Inheritance structures', 'Matrix Determinants calculations', 'SQL Join parameters query setups').
-        - Generate an exhaustive, long-form chronological timeline. You MUST output between 80 to 120 separate individual rows inside the "study_plan" array to cover the entire course context sequence comprehensively without truncating early.
-        
-        USER AVAILABILITY CONSTRAINTS:
-        - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
-        - Assume the current date is June 2026. Space rows out sequentially across separate months.
-        - Capacity: {hours} hours per day at a '{intensity}' pace.
-        - {weekend_rule}
-        - All dates must use 'YYYY-MM-DD' format.
-        
-        Syllabus Text:
-        {condensed_text}
-        """
+    max_retries = 3
+    base_delay = 4
+    for attempt in range(max_retries):
+        try:
+            client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+            weekend_rule = "STRICT RULE: Do not schedule any study blocks on Saturdays or Sundays." if no_weekends else "You can utilize weekends for study blocks."
+            
+            prompt = f"""
+            You are an elite academic strategy coach. Analyze the filtered syllabus data text and output a valid JSON string object.
+            The JSON object must contain exactly two array fields:
+            1. "tasks": an array of objects containing "n" (task name) and "d" (due date in YYYY-MM-DD).
+            2. "study_plan": an array of objects containing:
+               - "d": scheduled date (YYYY-MM-DD)
+               - "t": time slot window string
+               - "f": focus topic (precise conceptual chapter or lesson name extracted from the text layout)
+               - "a": suggested actionable study item
+               - "h": hours allocated (integer)
+            
+            CRITICAL LINEAR SEQUENCE RULE:
+            - Read the provided Syllabus Text systematically from TOP TO BOTTOM.
+            - You MUST generate your study plan row-by-row in the exact chronological order that the units/chapters/semesters appear in the text document. 
+            - When you encounter 'Semester 2' or 'Second Semester' milestones, look directly at the lines following it and extract the real technical lesson topics.
+            
+            STRICT FILLER BAN RULE:
+            - NEVER use vague, lazy placeholder phrases like 'Introduction to new topics', 'Review of all topics', 'Practice problems on new topics', or 'Final preparation for exams' repeatedly.
+            - Every single row inside the 'study_plan' must point to a real, concrete academic sub-topic or practical concept found in the text.
+            - Generate between 80 to 120 separate row entries to match the granular course scope cleanly without truncating early.
+            
+            USER AVAILABILITY CONSTRAINTS:
+            - Study window: strictly between {start_hr} and {end_hr}. Every 't' value must fall within this window.
+            - Assume the current date is June 2026. Space rows out sequentially across separate months.
+            - Capacity: {hours} hours per day at a '{intensity}' pace.
+            - {weekend_rule}
+            - All dates must use 'YYYY-MM-DD' format.
+            
+            Syllabus Text:
+            {condensed_text}
+            """
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": "You are a dense database logging script. Output raw JSON arrays matching the requested compressed single-character field keys perfectly. Never compress the row counts; generate as many comprehensive daily timeline items as possible to complete the matrix array."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            max_tokens=8192  
-        )
-        return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        return {"error_mode_active": True, "details": str(e)}
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are a linear timeline sequence compiler. You must output raw JSON arrays matching field keys perfectly. Map topics from top to bottom in strict linear chronological order without skipping sections. Maximize row generation count up to 120 distinct items."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=6000  
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "rate_limit" in error_msg.lower():
+                if attempt < max_retries - 1:
+                    time.sleep(base_delay * (2 ** attempt))
+                    continue
+            return {"error_mode_active": True, "details": error_msg}
 
-lottie_processing = load_lottie_url("https://assets8.lottiefiles.com/packages/lf20_vnikbe9e.json")
-
-# 3. GRAPHICS & THEME SYSTEM (CSS)
+# GRAPHICS THEME SYSTEM (CSS)
 st.html("""
 <style>
-    .main-title { font-size: 3.6rem !important; font-weight: 800; background: linear-gradient(90deg, #00C6FF, #0072FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 10px; margin-bottom: 25px; }
-    [data-testid="stMetricSimpleValue"] { font-size: 1.8rem !important; color: #00C6FF !important; font-weight: 700; }
-    div.stButton > button:first-child { background: linear-gradient(90deg, #00C6FF, #0072FF) !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 12px 24px !important; font-weight: 600 !important; }
-    div.stDownloadButton > button:first-child { background: #1E293B !important; color: #00C6FF !important; border: 1px solid rgba(0, 198, 255, 0.4) !important; border-radius: 8px !important; width: 100% !important; }
-    .progress-status-text { font-family: system-ui, sans-serif; font-size: 0.95rem; color: #00C6FF; font-weight: 500; margin-bottom: 4px; }
+    /* ✨ CUSTOM PALETTE RUNTIME ENGINE: BLUE | DARK BLUE | WHITE */
+    .main-title { 
+        font-size: 3.8rem !important; 
+        font-weight: 800; 
+        background: linear-gradient(
+            90deg, 
+            #0072FF 0%, 
+            #003399 35%, 
+            #FFFFFF 70%, 
+            #0072FF 100%
+        );
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: textGradientShift 7s linear infinite;
+        margin-bottom: 25px;
+        display: inline-block;
+    }
+
+    @keyframes textGradientShift {
+        0% { background-position: 0% center; }
+        100% { background-position: 200% center; }
+    }
+
+    div.stButton > button:first-child { background: linear-gradient(90deg, #00C6FF, #0072FF) !important; color: white !important; border: none !important; border-radius: 8px !important; font-weight: 600 !important; }
+    .auth-container { max-width: 450px; margin: 60px auto; padding: 30px; background: #1E293B; border-radius: 12px; border: 1px solid rgba(0,198,255,0.2); }
 </style>
 """)
 
-# 4. INTERFACE LAYOUT HEADER
+# ==========================================
+# GATEWAY PHASE: CORE AUTHENTICATION UI
+# ==========================================
+if st.session_state["user_uid"] is None:
+    st.markdown('<center><p class="main-title">Study Sync</p></center>', unsafe_allow_html=True)
+    
+    auth_tab1, auth_tab2 = st.tabs(["🔒 Secure Login", "📝 Create Account"])
+    
+    with auth_tab1:
+        with st.form("login_form"):
+            li_username = st.text_input("Username / Roll Number:", value="Aditya").strip()
+            li_email = st.text_input("Email Address:")
+            li_password = st.text_input("Password:", type="password")
+            submit_login = st.form_submit_button("Access Profile Console", use_container_width=True)
+            
+            if submit_login:
+                if not li_username:
+                    st.error("Please provide your profile Username / Roll Number.")
+                else:
+                    res = firebase_auth_request("signInWithPassword", li_email, li_password)
+                    if "localId" in res:
+                        st.session_state["user_uid"] = res["localId"]
+                        st.session_state["user_email"] = res["email"]
+                        st.session_state["username_val"] = li_username
+                        
+                        cloud_load = load_schedule_from_firebase(li_username)
+                        if cloud_load:
+                            st.session_state["ai_data"] = cloud_load
+                        st.success("Verification confirmed! Redirecting...")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error(f"Authentication Failed: {res.get('error', {}).get('message', 'Unknown Verification Route Error')}")
+                    
+    with auth_tab2:
+        with st.form("signup_form"):
+            su_username = st.text_input("Choose Unique Username / Roll Number:").strip()
+            su_email = st.text_input("Email Address Registration Target:")
+            su_password = st.text_input("Configure Strong Password:", type="password", help="Must be minimum 6 characters long")
+            submit_signup = st.form_submit_button("Register Cloud Profile Key", use_container_width=True)
+            
+            if submit_signup:
+                if not su_username:
+                    st.error("Please specify a custom Username or Roll Number slot.")
+                elif len(su_password) < 6:
+                    st.error("Security Restriction: Passwords must contain at least 6 characters.")
+                else:
+                    existing_profile = load_schedule_from_firebase(su_username)
+                    if existing_profile:
+                        st.error("⚠️ This profile name already exists in Firebase! Please choose a unique layout.")
+                    else:
+                        res = firebase_auth_request("signUp", su_email, su_password)
+                        if "localId" in res:
+                            save_schedule_to_firebase(su_username, [], [])
+                            st.success("Registration success! Cloud profile allocated. You can now login using the Login tab.")
+                        else:
+                            st.error(f"Registration Failed: {res.get('error', {}).get('message', 'Email profile conflict.')}")
+    st.stop()
+
+# ==========================================
+# RUNTIME ENVIRONMENT: DASHBOARD LAYOUT
+# ==========================================
 st.markdown('<p class="main-title">Study Sync</p>', unsafe_allow_html=True)
+
+profile_col1, profile_col2 = st.columns([5, 1])
+profile_col1.markdown(f"👤 Connected Account: **{st.session_state['user_email']}**")
+if profile_col2.button("🚪 Log Out", use_container_width=True):
+    st.session_state["user_uid"] = None
+    st.session_state["user_email"] = None
+    st.session_state["ai_data"] = None
+    st.rerun()
+
 st.markdown("---")
 
-# 5. SPLIT PANEL CONTROL INTERFACES
 left_panel, right_panel = st.columns([1, 2], gap="large")
 
 with left_panel:
-    st.subheader("⚙️ Configuration")
+    st.subheader("👤 Active Profile")
+    st.info(f"Logged in as: **{st.session_state['username_val']}**")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("⚙️ Schedule Parameters")
     with st.container(border=True):
         study_hours = st.slider("Daily Study Capacity (Hours)", 1, 8, 3)
         focus_level = st.select_slider("Target Study Intensity", options=["Casual", "Balanced", "Intense"])
         skip_weekends = st.toggle("Exclude Weekends")
         
     st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("🕒 Availability Window")
+    st.subheader("🕒 Time Horizon Window")
     with st.container(border=True):
         free_from = st.time_input("I am free from:", dt_time(17, 30))  
         free_until = st.time_input("I am free until:", dt_time(21, 30)) 
@@ -147,149 +324,97 @@ with left_panel:
         string_until = free_until.strftime("%I:%M %p")
 
 with right_panel:
-    st.subheader("Drop your PDF here")
-    uploaded_file = st.file_uploader("Upload Course Syllabus (PDF format)", type=["pdf"])
+    st.subheader("Drop your Syllabus PDF here")
+    uploaded_file = st.file_uploader("Upload Document (PDF context data)", type=["pdf"])
 
     if uploaded_file is not None:
-        st.success(f"⚡ Linked with sequence target: **{uploaded_file.name}**")
+        st.success(f"⚡ Linked with compilation targets: **{uploaded_file.name}**")
         
         if st.button("Generate Optimized Timeline", use_container_width=True):
-            
             start_minutes = free_from.hour * 60 + free_from.minute
             end_minutes = free_until.hour * 60 + free_until.minute
             available_duration_hours = (end_minutes - start_minutes) / 60
             
             if available_duration_hours < study_hours:
-                st.error(f"❌ **Configuration Conflict:** Your Availability Window ({available_duration_hours:.2f} hours) is shorter than your daily study target ({study_hours} hours).")
+                st.error("❌ Configuration Error: Allotted duration window cannot compress below required study capacity hours.")
                 st.stop()
             
             progress_bar = st.progress(0)
             status_message = st.empty()
             
-            # Phase 1: File Reading and High-Density Condensing
-            status_message.markdown('<p class="progress-status-text">🔄 [25%] Phase 1: Parsing PDF lines and compiling technical milestone metrics...</p>', unsafe_allow_html=True)
+            status_message.markdown('🔄 Parsing PDF text metadata structures...')
             progress_bar.progress(25)
             doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
             st.session_state["page_count"] = doc.page_count
-            full_text = ""
-            for page in doc:
-                full_text += page.get_text()
+            full_text = "".join([page.get_text() for page in doc])
                 
-            # HIGH-DENSITY TOPIC LINE SCANNERS
             filtered_lines = []
-            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "csa", "sec"]
-            
+            academic_keywords = ["week", "unit", "chapter", "topic", "assignment", "exam", "quiz", "test", "project", "lab", "module", "semester", "course", "subject"]
             for line in full_text.split("\n"):
                 clean_line = line.strip()
                 if any(kw in clean_line.lower() for kw in academic_keywords) or (len(clean_line) > 12 and any(char.isdigit() for char in clean_line)):
                     filtered_lines.append(clean_line)
             
             condensed_syllabus = "\n".join(filtered_lines)
+            if len(condensed_syllabus) > 14000:
+                condensed_syllabus = condensed_syllabus[:14000]
             
-            # CRITICAL SAFETY OVERRIDE: Tightened character truncation to bypass 413 network rejections completely
-            if len(condensed_syllabus) > 7000:
-                condensed_syllabus = condensed_syllabus[:7000]
-                
-            time.sleep(0.4)
-            
-            if not condensed_syllabus.strip():
-                progress_bar.empty()
-                status_message.empty()
-                st.error("❌ **Unreadable PDF Error:** Could not parse clear structural milestones from this file.")
-                st.stop()
-            
-            # Phase 2: Groq Engine Call
-            status_message.markdown('<p class="progress-status-text">🚀 [50%] Phase 2: Transmitting dense token packages to un-capped Groq hardware cores...</p>', unsafe_allow_html=True)
+            status_message.markdown('🚀 Dispatching datasets directly to Core hardware arrays...')
             progress_bar.progress(50)
-            
             raw_ai_output = extract_syllabus_with_ai(condensed_syllabus, study_hours, focus_level, skip_weekends, string_from, string_until)
             
-            if raw_ai_output is not None and "error_mode_active" in raw_ai_output:
-                progress_bar.empty()
-                status_message.empty()
-                st.error("❌ **Groq Core API Refusal Code:**")
-                st.code(raw_ai_output["details"], language="text")
-                st.stop()
-
-            if raw_ai_output is None:
-                progress_bar.empty()
-                status_message.empty()
-                st.error("⚠️ An unhandled exception occurred inside the Groq API gateway.")
+            if "error_mode_active" in raw_ai_output:
+                st.error("❌ Engine Pipeline Execution Refusal Code:")
+                st.code(raw_ai_output["details"])
                 st.stop()
             
-            # Phase 3: Structural De-compression & Expansion Loop
-            status_message.markdown('<p class="progress-status-text">📊 [75%] Phase 3: Inflating structural shorthand keys back to clear visual datagrides...</p>', unsafe_allow_html=True)
+            status_message.markdown('📊 Inflating matrix shorthands to layout configurations...')
             progress_bar.progress(75)
-            
-            mapped_tasks = [{"task_name": item.get("n", "Course Milestone"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
-            
+            mapped_tasks = [{"task_name": item.get("n", "Milestone Target"), "due_date": item.get("d", "2026-06-15")} for item in raw_ai_output.get("tasks", [])]
             mapped_plan = [
                 {
                     "Status": False,
                     "Scheduled Date": item.get("d", "2026-06-15"),
                     "Time Slot": item.get("t", f"{string_from} - {string_until}"),  
-                    "Focus Topic": item.get("f", "Topic Review Module"),
-                    "Suggested Action": item.get("a", "Review notes and practice core assignments"),
+                    "Focus Topic": item.get("f", "Core Topic Review"),
+                    "Suggested Action": item.get("a", "Review assigned reading segments"),
                     "Hours Allocated": item.get("h", int(study_hours))
                 } for item in raw_ai_output.get("study_plan", [])
             ]
             
-            st.session_state["ai_data"] = {
-                "tasks": mapped_tasks,
-                "study_plan": mapped_plan
-            }
-            time.sleep(0.4)
+            st.session_state["ai_data"] = {"tasks": mapped_tasks, "study_plan": mapped_plan}
             
-            # Phase 4: Sync Interfaces
-            status_message.markdown('<p class="progress-status-text">✨ [100%] Phase 4: Synchronizing interactive checklist frameworks...</p>', unsafe_allow_html=True)
+            save_schedule_to_firebase(st.session_state["username_val"], mapped_tasks, mapped_plan)
+            
             progress_bar.progress(100)
-            time.sleep(0.3)
-            
-            progress_bar.empty()
             status_message.empty()
+            st.rerun()
 
-    # --- RENDERING ENGINE STAGE ---
+    # --- MAIN VIEWING STAGE ---
     if st.session_state["ai_data"] is not None:
-        st.html("""
-            <div style="display: flex; align-items: center; background: rgba(0, 198, 255, 0.04); border: 1px solid rgba(0, 198, 255, 0.25); border-radius: 12px; padding: 20px 24px; margin-bottom: 32px;">
-                <div style="background: #00C6FF; color: #0E1117; font-weight: bold; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 18px;">✓</div>
-                <div style="display: flex; flex-direction: column;">
-                    <h4 style="color: #FFFFFF !important; font-family: system-ui; font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 0 4px 0 !important;">Timeline Optimized Successfully</h4>
-                    <p style="color: #A0AEC0 !important; font-family: system-ui; font-size: 0.9rem !important; margin: 0 !important;">Exhaustive multi-week roadmap parsed error-free via Groq API optimization.</p>
-                </div>
-            </div>
-        """)
-        
         total_tasks = len(st.session_state["ai_data"]["tasks"])
         total_rows = len(st.session_state["ai_data"]["study_plan"])
         
-        st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>Summary</p>", unsafe_allow_html=True)
         m_col1, m_col2, m_col3 = st.columns(3)
-        with m_col1:
-            st.container(border=True).metric(label="Pages Read", value=f"{st.session_state['page_count']} Pages")
-        with m_col2:
-            st.container(border=True).metric(label="AI Daily Milestones", value=f"{total_rows} Actions")
-        with m_col3:
-            st.container(border=True).metric(label="Daily Cap Target", value=f"{study_hours} Hours/Day")
+        m_col1.container(border=True).metric(label="Total Pages Sparsed", value=f"{st.session_state['page_count']} Pages")
+        m_col2.container(border=True).metric(label="Total Generated Milestones", value=f"{total_rows} Actions")
+        m_col3.container(border=True).metric(label="Active Target Profile", value=st.session_state["username_val"])
         
         st.markdown("<br>", unsafe_allow_html=True)
-        
         t_col1, t_col2 = st.columns([1, 2], gap="medium")
         
         with t_col1:
-            st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 15px;'>📅 Extracted Deadlines</p>", unsafe_allow_html=True)
+            st.markdown("#### 📅 Calendar Targets")
             st.dataframe(st.session_state["ai_data"]["tasks"], use_container_width=True)
             
         with t_col2:
-            st.markdown("<p style='font-size: 1.1rem; font-weight: 600; color: #FFFFFF; margin-bottom: 5px;'>🔄 Interactive Study Roadmap</p>", unsafe_allow_html=True)
-            
+            st.markdown("#### 🔄 Dynamic Interactive Roadmap Checklist")
             roadmap_df = pd.DataFrame(st.session_state["ai_data"]["study_plan"])
             
             total_items = len(roadmap_df)
             completed_items = roadmap_df["Status"].sum() if total_items > 0 else 0
             completion_percentage = int((completed_items / total_items) * 100) if total_items > 0 else 0
-            
-            st.markdown(f"<p style='font-size:0.85rem; color:#A0AEC0; margin-bottom:2px;'>Progress: {completed_items}/{total_items} Milestones Completed ({completion_percentage}%)</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:0.85rem; color:#A0AEC0;'>Tracker Completion: {completed_items}/{total_items} Items Completed ({completion_percentage}%)</p>", unsafe_allow_html=True)
             st.progress(completed_items / total_items if total_items > 0 else 0.0)
             
             edited_roadmap = st.data_editor(
@@ -302,26 +427,12 @@ with right_panel:
             
             if not edited_roadmap.equals(roadmap_df):
                 st.session_state["ai_data"]["study_plan"] = edited_roadmap.to_dict(orient="records")
+                save_schedule_to_firebase(st.session_state["username_val"], st.session_state["ai_data"]["tasks"], st.session_state["ai_data"]["study_plan"])
                 st.rerun()
             
             st.markdown("<br>", unsafe_allow_html=True)
             d_col1, d_col2 = st.columns(2)
-            
             with d_col1:
-                calendar_data = generate_ics_file(edited_roadmap)
-                st.download_button(
-                    label="📅 Export to Calendar (.ics)",
-                    data=calendar_data,
-                    file_name="studysync_schedule.ics",
-                    mime="text/calendar",
-                    use_container_width=True
-                )
+                st.download_button(label="📅 Sync with Calendar (.ics)", data=generate_ics_file(edited_roadmap), file_name=f"{st.session_state['username_val']}_schedule.ics", mime="text/calendar", use_container_width=True)
             with d_col2:
-                csv_data = edited_roadmap.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📊 Download Spreadsheet (.csv)",
-                    data=csv_data,
-                    file_name="studysync_checklist.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+                st.download_button(label="📊 Export Spreadsheet (.csv)", data=edited_roadmap.to_csv(index=False).encode('utf-8'), file_name=f"{st.session_state['username_val']}_checklist.csv", mime="text/csv", use_container_width=True)
